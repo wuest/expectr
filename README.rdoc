@@ -1,6 +1,6 @@
 = expectr
 
-Description goes here.
+Expect (see http://expect.nist.gov/) implementation in Ruby.  This version differs from the included Expect module by providing a more granular method of managing process, output, and implementing Expect's "interact" command.
 
 == Contributing to expectr
  

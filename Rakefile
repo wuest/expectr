@@ -13,12 +13,11 @@ require 'rake'
 
 require 'jeweler'
 Jeweler::Tasks.new do |gem|
-  # gem is a Gem::Specification... see http://docs.rubygems.org/read/chapter/20 for more options
   gem.name = "expectr"
   gem.homepage = "http://github.com/cwuest/expectr"
   gem.license = "MIT"
   gem.summary = %Q{Expect for Ruby}
-  gem.description = %Q{TODO: longer description of your gem}
+  gem.description = %Q{Implementation of NIST Expect in Ruby, allowing for fine-grained control of several aspects of program flow and implementing "interact" mode.}
   gem.email = "chris.wuest@rackspace.com"
   gem.authors = ["Chris Wuest"]
   # dependencies defined in Gemfile
@@ -28,16 +27,9 @@ Jeweler::RubygemsDotOrgTasks.new
 require 'rake/testtask'
 Rake::TestTask.new(:test) do |test|
   test.libs << 'lib' << 'test'
-  test.pattern = 'test/**/test_*.rb'
+  test.test_files = Dir.glob('test/**/test_*.rb')
+  #test.pattern = 'test/**/test_*.rb'
   test.verbose = true
-end
-
-require 'rcov/rcovtask'
-Rcov::RcovTask.new do |test|
-  test.libs << 'test'
-  test.pattern = 'test/**/test_*.rb'
-  test.verbose = true
-  test.rcov_opts << '--exclude "gems/*"'
 end
 
 task :default => :test

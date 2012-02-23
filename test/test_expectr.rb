@@ -39,21 +39,23 @@ class TestExpectr < Test::Unit::TestCase
 	end
 
 	def test_interact
-		exp = Expectr.new "bc", :flush_buffer => false
-		[
-			Thread.new {
-				sleep 1
-				exp.interact
-			},
-			Thread.new {
-				sleep 2
-				assert_equal exp.flush_buffer, true
-				exp.flush_buffer = false
-				exp.send "300+21\n"
-				exp.send "quit\n"
-			}
-		].each {|x| x.join}
+		unless RUBY_VERSION =~ /1.8/
+			exp = Expectr.new "bc", :flush_buffer => false
+			[
+				Thread.new {
+					sleep 1
+					exp.interact
+				},
+				Thread.new {
+					sleep 2
+					assert_equal exp.flush_buffer, true
+					exp.flush_buffer = false
+					exp.send "300+21\n"
+					exp.send "quit\n"
+				}
+			].each {|x| x.join}
 
-		assert_not_nil exp.expect /321/
+			assert_not_nil exp.expect /321/
+		end
 	end
 end

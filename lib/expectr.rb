@@ -13,6 +13,23 @@ end
 require 'timeout'
 require 'thread'
 
+# Fixes specifically for Ruby 1.8
+if RUBY_VERSION =~ /^1.8/
+	# Enforcing encoding is not needed in 1.8 (probably.)  So, we'll define
+	# String#encode! to do nothing, for interoperability.
+	class String #:nodoc:
+		def encode!(encoding)
+		end
+	end
+
+	# In Ruby 1.8, we want to ignore SIGCHLD.  This is for two reasons:
+	# * SIGCHLD will be sent (and cause exceptions) for every Expectr object
+	#   created
+	# * As John Carter documented in his RExpect library, calls to files which
+	#   do not exist can cause odd and unexpected behavior.
+	Signal.trap('CHLD', 'IGNORE')
+end
+
 # == Description
 # Expectr is an implementation of the Expect library in ruby (see
 # http://expect.nist.gov).

@@ -5,13 +5,13 @@
 
 Gem::Specification.new do |s|
   s.name = "expectr"
-  s.version = "0.5.0"
+  s.version = "0.5.1"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Chris Wuest"]
   s.date = "2012-02-23"
-  s.description = "Implementation of NIST Expect in Ruby, allowing for fine-grained control of several aspects of program flow and implementing \"interact\" mode."
-  s.email = "chris.wuest@rackspace.com"
+  s.description = "Implementation of functionality from NIST Expect in Ruby, with an emphasis on control and extensibility"
+  s.email = "chris@chriswuest.com"
   s.extra_rdoc_files = [
     "LICENSE.txt",
     "README.rdoc"
@@ -23,6 +23,7 @@ Gem::Specification.new do |s|
     "README.rdoc",
     "Rakefile",
     "VERSION",
+    "expectr.gemspec",
     "lib/expectr.rb",
     "test/helper.rb",
     "test/test_expectr.rb"

@@ -17,8 +17,8 @@ Jeweler::Tasks.new do |gem|
   gem.homepage = "http://github.com/cwuest/expectr"
   gem.license = "MIT"
   gem.summary = %Q{Expect for Ruby}
-  gem.description = %Q{Implementation of NIST Expect in Ruby, allowing for fine-grained control of several aspects of program flow and implementing "interact" mode.}
-  gem.email = "chris.wuest@rackspace.com"
+  gem.description = %Q{Implementation of functionality from NIST Expect in Ruby, with an emphasis on control and extensibility}
+  gem.email = "chris@chriswuest.com"
   gem.authors = ["Chris Wuest"]
   # dependencies defined in Gemfile
 end

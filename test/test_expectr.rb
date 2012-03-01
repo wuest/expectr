@@ -65,6 +65,11 @@ class TestExpectr < Test::Unit::TestCase
 
 	def test_executable
 		assert_nothing_raised { exp = Expectr.new "/bin/ls", :flush_buffer => false }
-		assert_raises(Errno::EACCES) { exp = Expectr.new "lib/expectr.rb", :flush_buffer => false }
+
+		# Ruby 1.8's PTY allows execution of non-executable/nonexistent files without complaint
+		unless RUBY_VERSION =~ /1.8/
+			assert_raises(Errno::ENOENT) { exp = Expectr.new "/bin/ThisFileShouldNotExist", :flush_buffer => false }
+			assert_raises(Errno::EACCES) { exp = Expectr.new "lib/expectr.rb", :flush_buffer => false }
+		end
 	end
 end

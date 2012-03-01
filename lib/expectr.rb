@@ -101,7 +101,7 @@ class Expectr
 	#
 	# === Arguments
 	# +cmd+::
-	#   Command to be executed (String)
+	#   Command to be executed (String or File)
 	# +args+::
 	#   Hash of modifiers for Expectr.  Meaningful values are:
 	# * :buffer_size::
@@ -116,13 +116,11 @@ class Expectr
 	# Spawn +cmd+ and attach to STDIN and STDOUT for new process.  Fall back
 	# to using Open4 if PTY is not present (this is the case on Windows
 	# implementations of ruby.
-	#
-  # === BUGS
-  #
-  # * Passing a File object to be executed does not work
   #
 	def initialize(cmd, args={})
-		raise ArgumentError, "String Expected" unless cmd.kind_of?(String)
+		raise ArgumentError, "String or File expected, was given #{cmd.class}" unless cmd.kind_of? String or cmd.kind_of? File
+		cmd = cmd.path if cmd.kind_of? File
+
 		args[0] = {} unless args[0]
 		@buffer = String.new
 		@discard = String.new

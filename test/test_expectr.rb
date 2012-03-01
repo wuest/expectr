@@ -58,4 +58,13 @@ class TestExpectr < Test::Unit::TestCase
 			assert_not_nil exp.expect /321/
 		end
 	end
+
+	def test_create_with_file
+		assert_nothing_raised { exp = Expectr.new File.new("/bin/ls"), :flush_buffer => false }
+	end
+
+	def test_executable
+		assert_nothing_raised { exp = Expectr.new "/bin/ls", :flush_buffer => false }
+		assert_raises(Errno::EACCES) { exp = Expectr.new "lib/expectr.rb", :flush_buffer => false }
+	end
 end

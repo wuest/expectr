@@ -184,11 +184,13 @@ class Expectr
 	# Relinquish control of the running process to the controlling terminal,
 	# acting simply as a pass-through for the life of the process.
 	#
-	# === Bugs
-	#
-	# * Interrupts are not handled and passed through to the application
+	# Interrupts should be caught and sent to the application.
 	#
 	def interact
+		oldtrap = trap 'INT' do
+				@stdin.syswrite "\C-c"
+		end
+
 		@flush_buffer = true
 		old_tty = `stty -g`
 		`stty -icanon min 1 time 0 -echo`
@@ -197,12 +199,13 @@ class Expectr
 			input = ''
 			while @pid > 0
 				if select([STDIN], nil, nil, 1)
-					@stdin.syswrite(STDIN.getc)
+					@stdin.syswrite STDIN.getc
 				end
 			end
 		end
 
 		in_thread.join
+		trap 'INT', oldtrap
 		`stty #{old_tty}`
 		return nil
 	end

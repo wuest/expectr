@@ -5,11 +5,11 @@
 
 Gem::Specification.new do |s|
   s.name = "expectr"
-  s.version = "0.7.0"
+  s.version = "0.8.0"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Chris Wuest"]
-  s.date = "2012-03-01"
+  s.date = "2012-04-24"
   s.description = "Implementation of functionality from NIST Expect in Ruby, with an emphasis on control and extensibility"
   s.email = "chris@chriswuest.com"
   s.extra_rdoc_files = [

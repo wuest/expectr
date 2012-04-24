@@ -27,7 +27,7 @@ if RUBY_VERSION =~ /^1.8/
 	#   created
 	# * As John Carter documented in his RExpect library, calls to files which
 	#   do not exist can cause odd and unexpected behavior.
-	Signal.trap('CHLD', 'IGNORE')
+	trap 'CHLD', Proc.new { nil }
 end
 
 # == Description
@@ -199,7 +199,7 @@ class Expectr
 			input = ''
 			while @pid > 0
 				if select([STDIN], nil, nil, 1)
-					@stdin.syswrite STDIN.getc
+					@stdin.syswrite STDIN.getc.chr
 				end
 			end
 		end

@@ -214,6 +214,7 @@ class Expectr
 	# Send +str+ to application
 	#
 	def send(str)
+		raise ArgumentError unless @pid > 0
 		@stdin.syswrite str
 	end
 

@@ -27,6 +27,12 @@ class TestExpectr < Test::Unit::TestCase
 		exp.expect /321/
 	end
 
+	def test_send_to_terminated
+		exp = Expectr.new "ls", :flush_buffer => false
+		sleep 1
+		assert_raises(ArgumentError) { exp.send "test\n" }
+	end
+
 	def test_clear_buffer
 		sleep 1
 		assert_not_equal @exp.buffer, ''

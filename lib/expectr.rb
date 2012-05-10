@@ -259,6 +259,7 @@ class Expectr
 							@out_update = false
 						end
 					end
+					sleep 0.1
 				end
 			end
 

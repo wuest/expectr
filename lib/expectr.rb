@@ -236,10 +236,6 @@ class Expectr
 	# Wait +timeout+ seconds to match +pattern+ in +buffer+.  If timeout is
 	# reached, raise an error unless +recoverable+ is true.
 	#
-	# === Bugs
-	#
-	# * Interrupts are not handled and passed through to the application
-	#
 	def expect(pattern, recoverable = false)
 		match = nil
 

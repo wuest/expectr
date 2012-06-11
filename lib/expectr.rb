@@ -147,7 +147,6 @@ class Expectr
 					begin
 						@stdout.sysread(@buffer_size, buf)
 					rescue Errno::EIO #Application went away.
-						Process.wait @pid
 						@pid = 0
 						break
 					end
@@ -161,6 +160,11 @@ class Expectr
 					end
 				end
 			end
+		end
+
+		Thread.new do
+			Process.wait @pid
+			@pid = 0
 		end
 	end
 
@@ -188,7 +192,7 @@ class Expectr
 	#
 	def interact
 		oldtrap = trap 'INT' do
-				@stdin.syswrite "\C-c"
+				send "\C-c"
 		end
 
 		@flush_buffer = true
@@ -199,7 +203,7 @@ class Expectr
 			input = ''
 			while @pid > 0
 				if select([STDIN], nil, nil, 1)
-					@stdin.syswrite STDIN.getc.chr
+					send STDIN.getc.chr
 				end
 			end
 		end
@@ -214,8 +218,12 @@ class Expectr
 	# Send +str+ to application
 	#
 	def send(str)
+		begin
+			@stdin.syswrite str
+		rescue Errno::EIO #Application went away.
+			@pid = 0
+		end
 		raise ArgumentError unless @pid > 0
-		@stdin.syswrite str
 	end
 
 	# 

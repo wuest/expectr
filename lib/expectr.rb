@@ -213,6 +213,7 @@ class Expectr
 		`stty #{old_tty}`
 		return nil
 	end
+	alias :interact! :interact
 
 	#
 	# Send +str+ to application

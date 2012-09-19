@@ -1,19 +1,51 @@
-= expectr
+= Expectr
 
-Expect (see http://expect.nist.gov/) implementation in Ruby.  This version differs from the included Expect module by providing a more granular method of managing process, output, and implementing Expect's "interact" command.
+Expectr is an API to the functionality of Expect (see http://expect.nist.gov/)
+implemented in ruby.
 
-== Contributing to expectr
- 
-* Check out the latest master to make sure the feature hasn't been implemented or the bug hasn't been fixed yet.
-* Check out the issue tracker to make sure someone already hasn't requested it and/or contributed it.
-* Fork the project.
-* Start a feature/bugfix branch.
-* Commit and push until you are happy with your contribution.
-* Make sure to add tests for it. This is important so I don't break it in a future version unintentionally.
-* Please try not to mess with the Rakefile, version, or history. If you want to have your own version, or is otherwise necessary, that is fine, but please isolate to its own commit so I can cherry-pick around it.
+== Using Expectr
+
+Effort is taken to make implementation as simple as possible.
+
+=== Automation
+
+Implementation of task automation should be relatively straightforward.  A
+lightweight application might look similar to the following:
+
+  # myapp.rb
+  require 'expectr'
+
+  exp = Expectr.new( '/bin/bash', flush_buffer: false )
+  exp.send( "ls\n" )
+  match = exp.expect( %r{bash} ) # => MatchData
+  match = exp.expect( "this shouldn't match anything" ) # raises Timeout::Error
+
+=== Interaction
+
+It is possible to allow a user to interact directly with an Expectr object
+as with the Expect functionality in TCL
+
+  # logmein.rb
+  require 'expectr'
+
+  ssh = { host: 'example.com', user: 'example', pass: 'password' }
+  exp = Expectr.new( "ssh #{ssh[:user]}@#{ssh[:host]}" )
+  exp.expect( %r{#{ssh[:user]}@#{ssh[:host]}'s password:} )
+  ssh.send( ssh[:pass] + "\n" )
+
+  ssh.interact!
+
+== Contributions
+
+Effort is made to keep external requirements to a minimum.  As such, presently
+there are no external requirements for development.  If you want to
+contribute, please:
+
+  * Fork the project.
+  * Make a branch for your contribution if it's more than a simple fix.
+  * Add tests for new functionality.
+  * Send me a pull request on Github
 
 == Copyright
 
-Copyright (c) 2012 Chris Wuest. See LICENSE.txt for
-further details.
-
+Copyright (c) 2012 Chris Wuest. See LICENSE for details.

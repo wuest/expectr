@@ -52,8 +52,9 @@ class Expectr
 
     cmd = cmd.path if cmd.kind_of? File
 
-    @buffer = String.new
-    @discard = String.new
+    @buffer = ''.encode("UTF-8")
+    @discard = ''.encode("UTF-8")
+
     @timeout = args[:timeout] || 30
     @flush_buffer = args[:flush_buffer].nil? ? true : args[:flush_buffer]
     @buffer_size = args[:buffer_size] || 8192
@@ -62,8 +63,6 @@ class Expectr
     @out_mutex = Mutex.new
     @out_update = false
     @interact = false
-
-    [@buffer, @discard].each {|x| x.encode! "UTF-8" }
 
     @stdout,@stdin,@pid = PTY.spawn cmd
 
@@ -224,7 +223,7 @@ class Expectr
   #
   def clear_buffer!
     @out_mutex.synchronize do
-      @buffer = ''
+      @buffer = ''.encode("UTF-8")
       @out_update = false
     end
   end

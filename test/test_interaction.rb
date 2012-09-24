@@ -89,6 +89,23 @@ class InteractionTest < Test::Unit::TestCase
     ].each {|x| x.join}
   end
 
+  def test_blocking_interact_mode
+    [
+      Thread.new {
+        sleep 0.5
+        @exp.interact!(blocking: true)
+      },
+      Thread.new {
+        sleep 1
+        @exp.flush_buffer = false
+        @exp.send("300+21\n")
+        @exp.send("quit\n")
+      }
+    ].each {|x| x.join}
+
+    assert_not_nil @exp.expect(/321/)
+  end
+
   def test_kill_process
     assert_equal true, @exp.kill!
     assert_equal 0, @exp.pid

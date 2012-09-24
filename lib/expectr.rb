@@ -18,6 +18,8 @@ class Expectr
   attr_accessor :timeout
   # Size of buffer in bytes to attempt to read in at once (default 8 KiB)
   attr_accessor :buffer_size
+  # Whether or not to constrain the buffer to buffer_size (default false)
+  attr_accessor :constrain
   # Whether to flush program output to STDOUT (default true)
   attr_accessor :flush_buffer
   # PID of running process
@@ -55,6 +57,8 @@ class Expectr
     @timeout = args[:timeout] || 30
     @flush_buffer = args[:flush_buffer].nil? ? true : args[:flush_buffer]
     @buffer_size = args[:buffer_size] || 8192
+    @constrain = args[:constrain] || false
+
     @out_mutex = Mutex.new
     @out_update = false
     @interact = false
@@ -75,12 +79,13 @@ class Expectr
             break
           end
 
-          buf.encode! "UTF-8"
           print_buffer buf
 
           @out_mutex.synchronize do
             @buffer << buf
-            @buffer = @buffer[-@buffer_size..-1] if @buffer.length > @buffer_size
+            if @buffer.length > @buffer_size && @constrain
+              @buffer = @buffer[-@buffer_size..-1]
+            end
             @out_update = true
           end
         end
@@ -99,18 +104,23 @@ class Expectr
   #
   # Interrupts should be caught and sent to the application.
   #
-  def interact!(blocking = false)
+  def interact!(args = {})
     raise ProcessError if @interact
+
+    blocking = args[:blocking] || false
+    @flush_buffer = args[:flush_buffer].nil? ? true : args[:flush_buffer]
+    @interact = true
+
+    # Save our old tty settings and set up our new environment
+    old_tty = `stty -g`
+    `stty -icanon min 1 time 0 -echo`
+
+    # SIGINT should be set along to the program
     oldtrap = trap 'INT' do
       send "\C-c"
     end
-
-    @flush_buffer = true
-    @interact = true
-    old_tty = `stty -g`
-    `stty -icanon min 1 time 0 -echo`
     
-    Thread.new do
+    interact = Thread.new do
       input = ''
       while @pid > 0 && @interact
         if select([STDIN], nil, nil, 1)
@@ -123,6 +133,8 @@ class Expectr
       `stty #{old_tty}`
       @interact = false
     end
+
+    blocking ? interact.join : interact
   end
 
   # 

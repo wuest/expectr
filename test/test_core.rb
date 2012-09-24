@@ -21,8 +21,8 @@ class CoreTests < Test::Unit::TestCase
   end
 
   def test_match_failure
-    assert_raises(Timeout::Error) { @exp.expect /ThisFileShouldNotExist/ }
-    assert_nothing_raised { @exp.expect /ThisFileShouldNotExist/, true }
+    assert_raises(Timeout::Error) { @exp.expect(/ThisFileShouldNotExist/) }
+    assert_nothing_raised { @exp.expect(/ThisFileShouldNotExist/, true) }
   end
 
   def test_clear_buffer

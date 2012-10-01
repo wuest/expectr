@@ -10,7 +10,23 @@ require 'expectr/error'
 # Expectr contrasts with Ruby's built-in Expect class by avoiding tying in
 # with the IO class, instead creating a new object entirely to allow for more
 # grainular control over the execution and display of the program being
-# run.  See README.rdoc for examples.
+# run.
+#
+# Examples
+#
+#   # SSH Login to another machine
+#   exp = Expectr.new('ssh user@example.com')
+#   exp.expect("Password:")
+#   exp.send('password')
+#   exp.interact!(blocking: true)
+#
+#   # See if a web server is running on the local host, react accordingly
+#   exp = Expectr.new('netstat -ntl|grep ":80 " && echo "WEB"', timeout: 1)
+#   if exp.expeect("WEB")
+#     # Do stuff if we see 'WEB' in the output
+#   else
+#     # Do other stuff
+#   end
 class Expectr
   # Public: Gets/sets the number of seconds a call to Expectr#expect may last
   attr_accessor :timeout

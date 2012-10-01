@@ -4,47 +4,44 @@ require 'thread'
 
 require 'expectr/error'
 
-#
-# Expectr is an API to the functionality of Expect (see
+# Public: Expectr is an API to the functionality of Expect (see
 # http://expect.nist.gov) implemented in ruby.
 #
 # Expectr contrasts with Ruby's built-in Expect class by avoiding tying in
 # with the IO class, instead creating a new object entirely to allow for more
 # grainular control over the execution and display of the program being
 # run.  See README.rdoc for examples.
-#
 class Expectr
-  # Number of seconds seconds a call to +expect+ may last (default 30)
+  # Public: Gets/sets the number of seconds a call to Expectr#expect may last
   attr_accessor :timeout
-  # Size of buffer in bytes to attempt to read in at once (default 8 KiB)
+  # Public: Gets/sets the number of bytes to use for the internal buffer
   attr_accessor :buffer_size
-  # Whether or not to constrain the buffer to buffer_size (default false)
+  # Public: Gets/sets whether to constrain the buffer to the buffer size
   attr_accessor :constrain
-  # Whether to flush program output to STDOUT (default true)
+  # Public: Gets/sets whether to flush program output to STDOUT
   attr_accessor :flush_buffer
-  # PID of running process
+  # Public: Returns the PID of the running process
   attr_reader :pid
-  # Active buffer to match against
+  # Public: Returns the active buffer to match against
   attr_reader :buffer
-  # Buffer passed since last call to Expectr#expect
+  # Public: Returns the buffer discarded by the latest call to Expectr#expect
   attr_reader :discard
 
+  # Public: Initialize a new Expectr object.
+  # Spawns a sub-process and attaches to STDIN and STDOUT for the new process.
   #
-  # Spawn a sub-process and attach to STDIN and STDOUT for new process.
-  # Accepts a String or File as the command, and a Hash containing the
-  # remainder of the arguments, with the following keys:
-  #
-  #   :timeout
-  #     Amount of time a call to expect has to complete (default 30)
-  #   :flush_buffer
-  #     Whether to flush output of the process to STDOUT (default true)
-  #   :buffer_size
-  #     Size of buffer to keep (if :constrain is true) as well as how much to
-  #     attempt to read from the sub-process at once (default 8KiB)
-  #   :constrain
-  #     Whether to constrain the internal buffer from the sub-process to
-  #     :buffer_size (default false)
-  #
+  # cmd  - A String or File referencing the application to launch
+  # args - A Hash used to specify options for the new object (default: {}):
+  #        :timeout      - Number of seconds that a call to Expectr#expect has
+  #                        to complete (default: 30)
+  #        :flush_buffer - Whether to flush output of the process to the
+  #                        console (default: true)
+  #        :buffer_size  - Number of bytes to attempt to read from sub-process
+  #                        at a time.  If :constrain is true, this will be the
+  #                        maximum size of the internal buffer as well.
+  #                        (default: 8192)
+  #        :constrain    - Whether to constrain the internal buffer from the
+  #                        sub-process to :buffer_size (default: false)
   def initialize(cmd, args={})
     unless cmd.kind_of? String or cmd.kind_of? File
      raise ArgumentError, "String or File expected"
@@ -97,12 +94,17 @@ class Expectr
     end
   end
 
-  # 
-  # Relinquish control of the running process to the controlling terminal,
-  # acting simply as a pass-through for the life of the process.
+  # Public: Relinquish control of the running process to the controlling
+  # terminal, acting as a pass-through for the life of the process.  SIGINT
+  # will be caught and sent to the application as "\C-c".
   #
-  # Interrupts should be caught and sent to the application.
+  # args - A Hash used to specify options to be used for interaction (default:
+  #        {}):
+  #        :flush_buffer - explicitly set @flush_buffer to the value specified
+  #        :blocking     - Whether to block on this call or allow code
+  #                        execution to continue (default: false)
   #
+  # Returns the interaction Thread
   def interact!(args = {})
     raise ProcessError if @interact
 
@@ -136,31 +138,37 @@ class Expectr
     blocking ? interact.join : interact
   end
 
-  # 
-  # Report whether or not current Expectr object is in interact mode
+  # Public: Report whether or not current Expectr object is in interact mode
   #
+  # Returns true or false
   def interact?
     @interact
   end
 
-  # 
-  # Leave interact mode
+  # Public: Cause the current Expectr object to drop out of interact mode
   #
+  # Returns nothing.
   def leave!
     @interact=false
   end
 
-  # 
-  # Kill the running process
+  # Public: Kill the running process, raise ProcessError if the pid isn't > 1
   #
+  # signal - Symbol, String, or Fixnum representing the signal to send to the
+  #          running process. (default: :HUP)
+  #
+  # Returns true if the process was successfully killed, false otherwise
   def kill!(signal=:HUP)
     raise ProcessError unless @pid > 0
     (Process::kill(signal.to_sym, @pid) == 1)
   end
 
+  # Public: Send input to the active process
   #
-  # Send input to the currently active process
+  # str - String to be sent to the active process
   #
+  # Returns nothing.
+  # Raises Expectr::ProcessError if the process isn't running
   def send(str)
     begin
       @stdin.syswrite str
@@ -170,18 +178,41 @@ class Expectr
     raise Expectr::ProcessError unless @pid > 0
   end
 
+  # Public: Wraps Expectr#send, appending a newline to the end of the string
   #
-  # Send input to the currently active process, append a newline
+  # str - String to be sent to the active process
   #
+  # Returns nothing.
   def puts(str)
     send str + "\n"
   end
 
+  # Public: Begin a countdown and search for a given String or Regexp in the
+  # output buffer.
   #
-  # Wait until the timeout value has passed to match a given pattern in the
-  # output buffer.  If the timeout is reached, raise an error unless
-  # recoverable is true.
+  # pattern     - String or Regexp representing what we want to find
+  # recoverable - Denotes whether failing to match the pattern should cause the
+  #               method to raise an exception
   #
+  # Examples
+  #
+  #   exp.expect("this should exist")
+  #   # => MatchData
+  #
+  #   exp.expect("this should exist") do
+  #     # ...
+  #   end
+  #
+  #   exp.expect(/not there/)
+  #   # Raises Timeout::Error
+  #
+  #   exp.expect(/not there/, true)
+  #   # => nil
+  # 
+  # Returns a MatchData object once a match is found, if no block given
+  # Yields the MatchData object representing the match
+  # Raises TypeError if something other than a String or Regexp is given
+  # Raises Timeout::Error match isn't found in time, unless recoverable is true
   def expect(pattern, recoverable = false)
     match = nil
 
@@ -218,9 +249,9 @@ class Expectr
     block_given? ? yield(match) : match
   end
 
-  # 
-  # Clear output buffer
+  # Public: Clear output buffer
   #
+  # Returns nothing.
   def clear_buffer!
     @out_mutex.synchronize do
       @buffer = ''.encode("UTF-8")
@@ -228,9 +259,11 @@ class Expectr
     end
   end
 
+  # Internal: Print buffer to STDOUT if @flush_buffer is true
   #
-  # Print buffer to STDOUT only if we are supposed to
+  # buf - String to be printed to STDOUT
   #
+  # Returns nothing.
   def print_buffer(buf)
     print buf if @flush_buffer
     STDOUT.flush unless STDOUT.sync

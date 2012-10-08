@@ -171,10 +171,10 @@ class Expectr
   # Public: Kill the running process, raise ProcessError if the pid isn't > 1
   #
   # signal - Symbol, String, or Fixnum representing the signal to send to the
-  #          running process. (default: :HUP)
+  #          running process. (default: :TERM)
   #
   # Returns true if the process was successfully killed, false otherwise
-  def kill!(signal=:HUP)
+  def kill!(signal=:TERM)
     raise ProcessError unless @pid > 0
     (Process::kill(signal.to_sym, @pid) == 1)
   end
@@ -196,10 +196,10 @@ class Expectr
 
   # Public: Wraps Expectr#send, appending a newline to the end of the string
   #
-  # str - String to be sent to the active process
+  # str - String to be sent to the active process (default: '')
   #
   # Returns nothing.
-  def puts(str)
+  def puts(str = '')
     send str + "\n"
   end
 
@@ -208,7 +208,7 @@ class Expectr
   #
   # pattern     - String or Regexp representing what we want to find
   # recoverable - Denotes whether failing to match the pattern should cause the
-  #               method to raise an exception
+  #               method to raise an exception (default: false)
   #
   # Examples
   #
@@ -225,10 +225,10 @@ class Expectr
   #   exp.expect(/not there/, true)
   #   # => nil
   # 
-  # Returns a MatchData object once a match is found, if no block given
+  # Returns a MatchData object once a match is found if no block is given
   # Yields the MatchData object representing the match
   # Raises TypeError if something other than a String or Regexp is given
-  # Raises Timeout::Error match isn't found in time, unless recoverable is true
+  # Raises Timeout::Error if a match isn't found in time, unless recoverable
   def expect(pattern, recoverable = false)
     match = nil
 

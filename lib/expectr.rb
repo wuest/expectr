@@ -77,12 +77,12 @@ class Expectr
     @out_update = false
     @interact = false
 
-    @stdout,@stdin,@pid = PTY.spawn cmd
+    @stdout,@stdin,@pid = PTY.spawn(cmd)
 
     Thread.new do
       while @pid > 0
         unless select([@stdout], nil, nil, @timeout).nil?
-          buf = ''
+          buf = ''.encode("UTF-8")
 
           begin
             @stdout.sysread(@buffer_size, buf)
@@ -91,7 +91,7 @@ class Expectr
             break
           end
 
-          print_buffer buf
+          print_buffer(buf)
 
           @out_mutex.synchronize do
             @buffer << buf
@@ -138,7 +138,7 @@ class Expectr
     end
     
     interact = Thread.new do
-      input = ''
+      input = ''.encode("UTF-8")
       while @pid > 0 && @interact
         if select([STDIN], nil, nil, 1)
           c = STDIN.getc.chr

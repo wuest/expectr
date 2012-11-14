@@ -3,7 +3,7 @@ require 'helper'
 class InteractionTest < Test::Unit::TestCase
   # Assume that bc(1) exists on the system for these tests
   def setup
-    @exp = Expectr.new("bc", :flush_buffer => false, :timeout => 1)
+    @exp = Expectr.new("bc", flush_buffer: false, timeout: 1)
   end
 
   def test_send_and_expect

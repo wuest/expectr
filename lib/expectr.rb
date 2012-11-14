@@ -60,7 +60,7 @@ class Expectr
   #                        sub-process to :buffer_size (default: false)
   def initialize(cmd, args={})
     unless cmd.kind_of? String or cmd.kind_of? File
-     raise ArgumentError, "String or File expected"
+      raise ArgumentError, "String or File expected"
     end
 
     cmd = cmd.path if cmd.kind_of? File
@@ -91,6 +91,7 @@ class Expectr
             break
           end
 
+          force_utf8(buf) unless buf.valid_encoding?
           print_buffer(buf)
 
           @out_mutex.synchronize do
@@ -284,4 +285,14 @@ class Expectr
     print buf if @flush_buffer
     STDOUT.flush unless STDOUT.sync
   end
+
+  # Internal: Encode a String twice to force UTF-8 encoding, dropping           
+  # problematic characters in the process.                                      
+  #                                                                             
+  # buf  - String to be encoded.                                                
+  #                                                                             
+  # Returns the encoded String.                                                 
+  def force_utf8(buf)                                                           
+    buf.force_encoding('ISO-8859-1').encode('UTF-8', 'UTF-8', replace: nil)     
+  end                                                                           
 end

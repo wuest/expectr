@@ -30,12 +30,14 @@ require 'expectr/error'
 class Expectr
   # Public: Gets/sets the number of seconds a call to Expectr#expect may last
   attr_accessor :timeout
+  # Public: Gets/sets whether to flush program output to STDOUT
+  attr_accessor :flush_buffer
   # Public: Gets/sets the number of bytes to use for the internal buffer
   attr_accessor :buffer_size
   # Public: Gets/sets whether to constrain the buffer to the buffer size
   attr_accessor :constrain
-  # Public: Gets/sets whether to flush program output to STDOUT
-  attr_accessor :flush_buffer
+  # Public: Whether to always attempt to match once on calls to Expectr#expect.
+  attr_accessor :force_match
   # Public: Returns the PID of the running process
   attr_reader :pid
   # Public: Returns the active buffer to match against
@@ -58,6 +60,12 @@ class Expectr
   #                        (default: 8192)
   #        :constrain    - Whether to constrain the internal buffer from the
   #                        sub-process to :buffer_size (default: false)
+  #        :force_match  - Whether to always attempt to match against the
+  #                        internal buffer on a call to Expectr#expect.  This
+  #                        is relevant following a failed call to
+  #                        Expectr#expect, which will leave the update status
+  #                        set to false, preventing further matches until more
+  #                        output is generated otherwise. (default: false)
   def initialize(cmd, args={})
     unless cmd.kind_of? String or cmd.kind_of? File
       raise ArgumentError, "String or File expected"
@@ -72,6 +80,7 @@ class Expectr
     @flush_buffer = args[:flush_buffer].nil? ? true : args[:flush_buffer]
     @buffer_size = args[:buffer_size] || 8192
     @constrain = args[:constrain] || false
+    @force_match = args[:force_match] || false
 
     @out_mutex = Mutex.new
     @out_update = false
@@ -232,6 +241,7 @@ class Expectr
   # Raises Timeout::Error if a match isn't found in time, unless recoverable
   def expect(pattern, recoverable = false)
     match = nil
+    @out_update = true if @force_match
 
     case pattern
     when String

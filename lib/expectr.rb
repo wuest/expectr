@@ -143,9 +143,14 @@ class Expectr
     old_tty = `stty -g`
     `stty -icanon min 1 time 0 -echo`
 
-    # SIGINT should be set along to the program
-    oldtrap = trap 'INT' do
+    # SIGINT should be sent along to the process.
+    old_int_trap = trap 'INT' do
       send "\C-c"
+    end
+
+    # SIGTSTP should be sent along to the process as well.
+    old_tstp_trap = trap 'TSTP' do
+      send "\C-z"
     end
     
     interact = Thread.new do
@@ -157,7 +162,8 @@ class Expectr
         end
       end
 
-      trap 'INT', oldtrap
+      trap 'INT', old_int_trap
+      trap 'TSTP', old_tstp_trap
       `stty #{old_tty}`
       @interact = false
     end

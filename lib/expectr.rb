@@ -3,6 +3,7 @@ require 'timeout'
 require 'thread'
 
 require 'expectr/error'
+require 'expectr/version'
 
 # Public: Expectr is an API to the functionality of Expect (see
 # http://expect.nist.gov) implemented in ruby.

@@ -1,6 +1,7 @@
 require 'pty'
 require 'timeout'
 require 'thread'
+require 'io/console'
 
 require 'expectr/error'
 require 'expectr/version'
@@ -88,6 +89,7 @@ class Expectr
     @interact = false
 
     @stdout,@stdin,@pid = PTY.spawn(cmd)
+    @stdout.winsize = STDOUT.winsize
 
     Thread.new do
       while @pid > 0
@@ -152,6 +154,11 @@ class Expectr
     old_tstp_trap = trap 'TSTP' do
       send "\C-z"
     end
+
+    # SIGWINCH should trigger an update to the child process
+    old_winch_trap = trap 'WINCH' do
+      @stdout.winsize = STDOUT.winsize
+    end
     
     interact = Thread.new do
       input = ''.encode("UTF-8")
@@ -164,6 +171,7 @@ class Expectr
 
       trap 'INT', old_int_trap
       trap 'TSTP', old_tstp_trap
+      trap 'WINCH', old_winch_trap
       `stty #{old_tty}`
       @interact = false
     end
@@ -291,6 +299,13 @@ class Expectr
       @buffer = ''.encode("UTF-8")
       @out_update = false
     end
+  end
+
+  # Public: Return the child's window size.
+  #
+  # Returns a two-element array (same as IO#winsize).
+  def winsize
+    @stdout.winsize
   end
 
   # Internal: Print buffer to STDOUT if @flush_buffer is true

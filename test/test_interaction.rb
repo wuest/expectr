@@ -37,6 +37,10 @@ class InteractionTest < Test::Unit::TestCase
     assert_raises(Expectr::ProcessError) { @exp.send("test\n") }
   end
 
+  def test_winsize_set
+    assert_not_equal [0, 0], @exp.winsize
+  end
+
   def test_interact_sets_appropriate_flags
     [
       Thread.new {
@@ -104,11 +108,5 @@ class InteractionTest < Test::Unit::TestCase
     ].each {|x| x.join}
 
     assert_not_nil @exp.expect(/321/)
-  end
-
-  def test_kill_process
-    assert_equal true, @exp.kill!
-    assert_equal 0, @exp.pid
-    assert_raises(Expectr::ProcessError) { @exp.send("test\n") }
   end
 end

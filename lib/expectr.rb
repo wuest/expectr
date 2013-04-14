@@ -32,7 +32,7 @@ require 'expectr/version'
 class Expectr
   # Public: Gets/sets the number of seconds a call to Expectr#expect may last
   attr_accessor :timeout
-  # Public: Gets/sets whether to flush program output to STDOUT
+  # Public: Gets/sets whether to flush program output to $stdout
   attr_accessor :flush_buffer
   # Public: Gets/sets the number of bytes to use for the internal buffer
   attr_accessor :buffer_size
@@ -86,7 +86,7 @@ class Expectr
     @interact = false
 
     @stdout,@stdin,@pid = PTY.spawn(cmd)
-    @stdout.winsize = STDOUT.winsize
+    @stdout.winsize = $stdout.winsize
 
     Thread.new do
       process_output while @pid > 0
@@ -132,14 +132,14 @@ class Expectr
 
     # SIGWINCH should trigger an update to the child process
     old_winch_trap = trap 'WINCH' do
-      @stdout.winsize = STDOUT.winsize
+      @stdout.winsize = $stdout.winsize
     end
     
     interact = Thread.new do
       input = ''.encode("UTF-8")
       while @pid > 0 && @interact
-        if select([STDIN], nil, nil, 1)
-          c = STDIN.getc.chr
+        if select([$stdin], nil, nil, 1)
+          c = $stdin.getc.chr
           send c unless c.nil?
         end
       end
@@ -283,14 +283,14 @@ class Expectr
     @stdout.winsize
   end
 
-  # Internal: Print buffer to STDOUT if @flush_buffer is true
+  # Internal: Print buffer to $stdout if @flush_buffer is true
   #
-  # buf - String to be printed to STDOUT
+  # buf - String to be printed to $stdout
   #
   # Returns nothing.
   def print_buffer(buf)
     print buf if @flush_buffer
-    STDOUT.flush unless STDOUT.sync
+    $stdout.flush unless $stdout.sync
   end
 
   # Internal: Encode a String twice to force UTF-8 encoding, dropping           

@@ -14,22 +14,23 @@ class SignalHandlerTest < Test::Unit::TestCase
       },
       Thread.new {
         sleep 1
-        @exp.flush_buffer=false
+        @exp.flush_buffer = false
         assert_nothing_raised do
-          $stdout.winsize = [10,10]
+          $stdout.winsize = [10, 10]
         end
         sleep 0.1
-        assert_equal [10,10], @exp.winsize
+        assert_equal([10, 10], @exp.winsize)
         @exp.puts("quit")
       }
-    ].each {|x| x.join}
+    ].each { |x| x.join }
 
     $stdout.winsize = winsize
   end
 
   def test_kill_process
-    assert_equal true, @exp.kill!
-    assert_equal 0, @exp.pid
+    assert_equal(true, @exp.kill!)
+    sleep 0.5
+    assert_equal(0, @exp.pid)
     assert_raises(Expectr::ProcessError) { @exp.send("test\n") }
   end
 end

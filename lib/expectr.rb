@@ -72,8 +72,8 @@ class Expectr
     cmd = cmd.path if cmd.kind_of?(File)
     raise ArgumentError, "String or File expected" unless cmd.kind_of?(String)
 
-    @buffer = ''.encode("UTF-8")
-    @discard = ''.encode("UTF-8")
+    @buffer = ''
+    @discard = ''
 
     @timeout = args[:timeout] || 30
     @flush_buffer = args[:flush_buffer].nil? ? true : args[:flush_buffer]
@@ -117,7 +117,7 @@ class Expectr
 
     interact = Thread.new do
       env = prepare_interact_environment
-      input = ''.encode("UTF-8")
+      input = ''
 
       while @pid > 0 && @interact
         if select([$stdin], nil, nil, 1)
@@ -237,7 +237,7 @@ class Expectr
   # Returns nothing.
   def clear_buffer!
     @out_mutex.synchronize do
-      @buffer = ''.encode("UTF-8")
+      @buffer = ''
       @out_update = false
     end
   end
@@ -278,7 +278,7 @@ class Expectr
   # Returns nothing.
   def process_output
     unless select([@stdout], nil, nil, @timeout).nil?
-      buf = ''.encode("UTF-8")
+      buf = ''
 
       begin
         @stdout.sysread(@buffer_size, buf)

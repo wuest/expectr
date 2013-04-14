@@ -209,27 +209,15 @@ class Expectr
   # Raises Timeout::Error if a match isn't found in time, unless recoverable
   def expect(pattern, recoverable = false)
     match = nil
-    @out_update = true if @force_match
-
-    case pattern
-    when String
-      pattern = Regexp.new(Regexp.quote(pattern))
-    when Regexp
-    else
+    @out_update ||= @force_match
+    pattern = Regexp.new(Regexp.quote(pattern)) if pattern.kind_of?(String)
+    unless pattern.kind_of?(Regexp)
       raise TypeError, "Pattern class should be String or Regexp"
     end
 
     begin
       Timeout::timeout(@timeout) do
-        while match.nil?
-          if @out_update
-            @out_mutex.synchronize do
-              match = pattern.match @buffer
-              @out_update = false
-            end
-          end
-          sleep 0.1
-        end
+        match = check_match(pattern)
       end
 
       @out_mutex.synchronize do
@@ -350,5 +338,24 @@ class Expectr
     end
     `stty #{env[:tty]}`
     @interact = false
+  end
+
+  # Internal: Check for a match against a given pattern until a match is found.
+  # This method should be wrapped in a Timeout block or otherwise have some
+  # mechanism to break out of the loop.
+  #
+  # Returns a MatchData object containing the match found.
+  def check_match(pattern)
+    match = nil
+    while match.nil?
+      if @out_update
+        @out_mutex.synchronize do
+          match = pattern.match(@buffer)
+          @out_update = false
+        end
+      end
+      sleep 0.1
+    end
+    match
   end
 end

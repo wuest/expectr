@@ -30,6 +30,12 @@ require 'expectr/version'
 #     # Do other stuff
 #   end
 class Expectr
+  DEFAULT_TIMEOUT      = 30
+  DEFAULT_FLUSH_BUFFER = true
+  DEFAULT_BUFFER_SIZE  = 8192
+  DEFAULT_CONSTRAIN    = false
+  DEFAULT_FORCE_MATCH  = false
+
   # Public: Gets/sets the number of seconds a call to Expectr#expect may last
   attr_accessor :timeout
   # Public: Gets/sets whether to flush program output to $stdout
@@ -72,15 +78,9 @@ class Expectr
     cmd = cmd.path if cmd.kind_of?(File)
     raise ArgumentError, "String or File expected" unless cmd.kind_of?(String)
 
+    parse_options(args)
     @buffer = ''
     @discard = ''
-
-    @timeout = args[:timeout] || 30
-    @flush_buffer = args[:flush_buffer].nil? ? true : args[:flush_buffer]
-    @buffer_size = args[:buffer_size] || 8192
-    @constrain = args[:constrain] || false
-    @force_match = args[:force_match] || false
-
     @out_mutex = Mutex.new
     @out_update = false
     @interact = false
@@ -89,7 +89,7 @@ class Expectr
     @stdout.winsize = $stdout.winsize
 
     Thread.new do
-      process_output while @pid > 0
+      process_output
     end
 
     Thread.new do
@@ -272,29 +272,61 @@ class Expectr
 
   private
 
+  # Internal: Determine values of instance options and set instance variables
+  # appropriately, allowing for default values where nothing is passed.
+  #
+  # args - A Hash used to specify options for the new object (default: {}):
+  #        :timeout      - Number of seconds that a call to Expectr#expect has
+  #                        to complete.
+  #        :flush_buffer - Whether to flush output of the process to the
+  #                        console.
+  #        :buffer_size  - Number of bytes to attempt to read from sub-process
+  #                        at a time.  If :constrain is true, this will be the
+  #                        maximum size of the internal buffer as well.
+  #        :constrain    - Whether to constrain the internal buffer from the
+  #                        sub-process to :buffer_size.
+  #        :force_match  - Whether to always attempt to match against the
+  #                        internal buffer on a call to Expectr#expect.  This
+  #                        is relevant following a failed call to
+  #                        Expectr#expect, which will leave the update status
+  #                        set to false, preventing further matches until more
+  #                        output is generated otherwise.
+  #
+  # Returns nothing.
+  def parse_options(args)
+    @timeout = args[:timeout] || DEFAULT_TIMEOUT
+    @buffer_size = args[:buffer_size] || DEFAULT_BUFFER_SIZE
+    @constrain = args[:constrain] || DEFAULT_CONSTRAIN
+    @force_match = args[:force_match] || DEFAULT_FORCE_MATCH
+    @flush_buffer = args[:flush_buffer]
+    @flush_buffer = DEFAULT_FLUSH_BUFFER if @flush_buffer.nil?
+  end
+
   # Internal: Read from the process's stdout.  Force UTF-8 encoding, append to
   # the internal buffer, and print to $stdout if appropriate.
   #                                                                             
   # Returns nothing.
   def process_output
-    unless select([@stdout], nil, nil, @timeout).nil?
-      buf = ''
+    while @pid > 0
+      unless select([@stdout], nil, nil, @timeout).nil?
+        buf = ''
 
-      begin
-        @stdout.sysread(@buffer_size, buf)
-      rescue Errno::EIO #Application went away.
-        @pid = 0
-        return
-      end
-
-      print_buffer(force_utf8(buf))
-
-      @out_mutex.synchronize do
-        @buffer << buf
-        if @constrain && @buffer.length > @buffer_size
-          @buffer = @buffer[-@buffer_size..-1]
+        begin
+          @stdout.sysread(@buffer_size, buf)
+        rescue Errno::EIO #Application went away.
+          @pid = 0
+          return
         end
-        @out_update = true
+
+        print_buffer(force_utf8(buf))
+
+        @out_mutex.synchronize do
+          @buffer << buf
+          if @constrain && @buffer.length > @buffer_size
+            @buffer = @buffer[-@buffer_size..-1]
+          end
+          @out_update = true
+        end
       end
     end
   end

@@ -69,11 +69,8 @@ class Expectr
   #                        set to false, preventing further matches until more
   #                        output is generated otherwise. (default: false)
   def initialize(cmd, args={})
-    unless cmd.kind_of? String or cmd.kind_of? File
-      raise ArgumentError, "String or File expected"
-    end
-
-    cmd = cmd.path if cmd.kind_of? File
+    cmd = cmd.path if cmd.kind_of?(File)
+    raise ArgumentError, "String or File expected" unless cmd.kind_of?(String)
 
     @buffer = ''.encode("UTF-8")
     @discard = ''.encode("UTF-8")
@@ -92,29 +89,7 @@ class Expectr
     @stdout.winsize = STDOUT.winsize
 
     Thread.new do
-      while @pid > 0
-        unless select([@stdout], nil, nil, @timeout).nil?
-          buf = ''.encode("UTF-8")
-
-          begin
-            @stdout.sysread(@buffer_size, buf)
-          rescue Errno::EIO #Application went away.
-            @pid = 0
-            break
-          end
-
-          force_utf8(buf) unless buf.valid_encoding?
-          print_buffer(buf)
-
-          @out_mutex.synchronize do
-            @buffer << buf
-            if @buffer.length > @buffer_size && @constrain
-              @buffer = @buffer[-@buffer_size..-1]
-            end
-            @out_update = true
-          end
-        end
-      end
+      process_output while @pid > 0
     end
 
     Thread.new do
@@ -325,6 +300,36 @@ class Expectr
   #                                                                             
   # Returns the encoded String.                                                 
   def force_utf8(buf)                                                           
+    return buf if buf.valid_encoding?
     buf.force_encoding('ISO-8859-1').encode('UTF-8', 'UTF-8', replace: nil)     
   end                                                                           
+
+  private
+
+  # Internal: Read from the process's stdout.  Force UTF-8 encoding, append to
+  # the internal buffer, and print to $stdout if appropriate.
+  #                                                                             
+  # Returns nothing.
+  def process_output
+    unless select([@stdout], nil, nil, @timeout).nil?
+      buf = ''.encode("UTF-8")
+
+      begin
+        @stdout.sysread(@buffer_size, buf)
+      rescue Errno::EIO #Application went away.
+        @pid = 0
+        return
+      end
+
+      print_buffer(force_utf8(buf))
+
+      @out_mutex.synchronize do
+        @buffer << buf
+        if @constrain && @buffer.length > @buffer_size
+          @buffer = @buffer[-@buffer_size..-1]
+        end
+        @out_update = true
+      end
+    end
+  end
 end

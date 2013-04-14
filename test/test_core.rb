@@ -4,7 +4,7 @@ class CoreTests < Test::Unit::TestCase
   # For the purpose of testing, we will assume we are working within a POSIX
   # environment.
   def setup
-    @exp = Expectr.new("ls /dev", flush_buffer: false, timeout: 1,
+    @exp = Expectr.new("ls /dev && sleep 5", flush_buffer: false, timeout: 1,
                        buffer_size: 4096)
   end
 
@@ -33,7 +33,7 @@ class CoreTests < Test::Unit::TestCase
 
   def test_clear_buffer
     sleep 1
-    assert_not_equal(@exp.buffer, '')
+    assert_not_equal('', @exp.buffer)
     @exp.clear_buffer!
     assert_equal('', @exp.buffer)
   end
@@ -45,6 +45,6 @@ class CoreTests < Test::Unit::TestCase
   end
 
   def test_pid_set
-    assert @exp.pid > 0
+    assert_not_equal(0, @exp.pid)
   end
 end

@@ -114,29 +114,11 @@ class Expectr
 
     blocking = args[:blocking] || false
     @flush_buffer = args[:flush_buffer].nil? ? true : args[:flush_buffer]
-    @interact = true
 
-    # Save our old tty settings and set up our new environment
-    old_tty = `stty -g`
-    `stty -icanon min 1 time 0 -echo`
-
-    # SIGINT should be sent along to the process.
-    old_int_trap = trap 'INT' do
-      send "\C-c"
-    end
-
-    # SIGTSTP should be sent along to the process as well.
-    old_tstp_trap = trap 'TSTP' do
-      send "\C-z"
-    end
-
-    # SIGWINCH should trigger an update to the child process
-    old_winch_trap = trap 'WINCH' do
-      @stdout.winsize = $stdout.winsize
-    end
-    
     interact = Thread.new do
+      env = prepare_interact_environment
       input = ''.encode("UTF-8")
+
       while @pid > 0 && @interact
         if select([$stdin], nil, nil, 1)
           c = $stdin.getc.chr
@@ -144,11 +126,7 @@ class Expectr
         end
       end
 
-      trap 'INT', old_int_trap
-      trap 'TSTP', old_tstp_trap
-      trap 'WINCH', old_winch_trap
-      `stty #{old_tty}`
-      @interact = false
+      restore_environment(env)
     end
 
     blocking ? interact.join : interact
@@ -331,5 +309,46 @@ class Expectr
         @out_update = true
       end
     end
+  end
+
+  # Internal: Prepare environment for interact mode, saving original
+  # environment parameters.
+  #                                                                             
+  # Returns a Hash object with two keys: :tty containing original tty
+  # information and :sig containing signal handlers which have been replaced.
+  def prepare_interact_environment
+    env = {sig: {}}
+    # Save our old tty settings and set up our new environment
+    env[:tty] = `stty -g`
+    `stty -icanon min 1 time 0 -echo`
+
+    # SIGINT should be sent along to the process.
+    env[:sig]['INT'] = trap 'INT' do
+      send "\C-c"
+    end
+
+    # SIGTSTP should be sent along to the process as well.
+    env[:sig]['TSTP'] = trap 'TSTP' do
+      send "\C-z"
+    end
+
+    # SIGWINCH should trigger an update to the child process
+    env[:sig]['WINCH'] = trap 'WINCH' do
+      @stdout.winsize = $stdout.winsize
+    end
+
+    @interact = true
+    env
+  end
+
+  # Internal: Restore environment post interact mode from saved parameters.
+  #                                                                             
+  # Returns nothing.
+  def restore_environment(env)
+    env[:sig].each_key do |sig|
+      trap sig, env[:sig][sig]
+    end
+    `stty #{env[:tty]}`
+    @interact = false
   end
 end

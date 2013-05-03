@@ -86,7 +86,7 @@ class Expectr
     @interact = false
 
     @stdout,@stdin,@pid = PTY.spawn(cmd)
-    @stdout.winsize = $stdout.winsize
+    @stdout.winsize = $stdout.winsize if $stdout.tty?
 
     Thread.new do
       process_output

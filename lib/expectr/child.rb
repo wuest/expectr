@@ -85,6 +85,38 @@ class Expectr
       }
     end
 
+    def interface_prepare_interact_environment
+      -> {
+        env = {sig: {}}
+
+        # Save old tty settings and set up the new environment
+        env[:tty] = `stty -g`
+        `stty -icanon min 1 time 0 -echo`
+
+        # SIGINT should be sent to the child as \C-c
+        env[:sig]['INT'] = trap 'INT' do
+          send "\C-c"
+        end
+
+        # SIGTSTP should be sent to the process as \C-z
+        env[:sig]['TSTP'] = trap 'TSTP' do
+          send "\C-z"
+        end
+
+        # SIGWINCH should trigger an update to the child processes window size
+        env[:sig]['WINCH'] = trap 'WINCH' do
+          @stdout.winsize = $stdout.winsize
+        end
+
+        @interact = true
+        env
+      }
+    end
+
+    # Public: Create the thread containing the loop which is responsible for
+    # handling input from the user in interact mode.
+    #
+    # Returns a Thread containing the running loop.
     def interface_interact_thread
       -> {
         Thread.new do
@@ -101,6 +133,27 @@ class Expectr
           restore_environment(env)
         end
       }
+    end
+
+    # Public: Return the PTY's window size.
+    #
+    # Returns a two-element Array (same as IO#winsize)
+    def interface_winsize
+      -> {
+        @stdout.winsize
+      }
+    end
+
+    # Public: Present a streamlined interface to create a new Expectr instance.
+    #
+    # cmd  - A String or File referencing the application to launch.
+    # args - A Hash used to specify options for the new object, per
+    #        Expectr#initialize.
+    #
+    # Returns a new Expectr object
+    def self.spawn(cmd, args = {})
+      args[:interface] = :child
+      Expectr.new(cmd, args)
     end
   end
 end

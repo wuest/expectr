@@ -6,6 +6,7 @@ require 'expectr/error'
 require 'expectr/version'
 
 require 'expectr/child'
+require 'expectr/adopt'
 
 # Public: Expectr is an API to the functionality of Expect (see
 # http://expect.nist.gov) implemented in ruby.
@@ -84,16 +85,9 @@ class Expectr
     case args[:interface]
     when :lambda
     when :adopt
+      interface = call_adopt_interface(args)
     else
-      interface = Expectr::Child.new(cmd)
-      @stdin = interface.stdin
-      @stdout = interface.stdout
-      @pid = interface.pid
-
-      Thread.new do
-        Process.wait @pid
-        @pid = 0
-      end
+      interface = call_child_interface(cmd)
     end
 
     interface.init_instance.each do |spec|
@@ -191,7 +185,7 @@ class Expectr
         @out_update = true
       end
     rescue Timeout::Error => details
-      raise details unless recoverable
+      raise(Timeout::Error, details) unless recoverable
     end
 
     block_given? ? yield(match) : match
@@ -202,16 +196,9 @@ class Expectr
   # Returns nothing.
   def clear_buffer!
     @out_mutex.synchronize do
-      @buffer = ''
+      @buffer.clear
       @out_update = false
     end
-  end
-
-  # Public: Return the child's window size.
-  #
-  # Returns a two-element array (same as IO#winsize).
-  def winsize
-    @stdout.winsize
   end
 
   private
@@ -222,7 +209,7 @@ class Expectr
   #
   # Returns nothing.
   def print_buffer(buf)
-    print buf if @flush_buffer
+    $stdout.print buf if @flush_buffer
     $stdout.flush unless $stdout.sync
   end
 
@@ -295,47 +282,6 @@ class Expectr
     end
   end
 
-  # Internal: Prepare environment for interact mode, saving original
-  # environment parameters.
-  #                                                                             
-  # Returns a Hash object with two keys: :tty containing original tty
-  # information and :sig containing signal handlers which have been replaced.
-  def prepare_interact_environment
-    env = {sig: {}}
-    # Save our old tty settings and set up our new environment
-    env[:tty] = `stty -g`
-    `stty -icanon min 1 time 0 -echo`
-
-    # SIGINT should be sent along to the process.
-    env[:sig]['INT'] = trap 'INT' do
-      send "\C-c"
-    end
-
-    # SIGTSTP should be sent along to the process as well.
-    env[:sig]['TSTP'] = trap 'TSTP' do
-      send "\C-z"
-    end
-
-    # SIGWINCH should trigger an update to the child process
-    env[:sig]['WINCH'] = trap 'WINCH' do
-      @stdout.winsize = $stdout.winsize
-    end
-
-    @interact = true
-    env
-  end
-
-  # Internal: Restore environment post interact mode from saved parameters.
-  #                                                                             
-  # Returns nothing.
-  def restore_environment(env)
-    env[:sig].each_key do |sig|
-      trap sig, env[:sig][sig]
-    end
-    `stty #{env[:tty]}`
-    @interact = false
-  end
-
   # Internal: Check for a match against a given pattern until a match is found.
   # This method should be wrapped in a Timeout block or otherwise have some
   # mechanism to break out of the loop.
@@ -350,8 +296,47 @@ class Expectr
           @out_update = false
         end
       end
+      break unless match.nil?
       sleep 0.1
     end
     match
+  end
+
+  # Internal: Call the Child Interface to instantiate the Expectr object.
+  # 
+  # cmd - String or File object referencing the command to be run.
+  #
+  # Returns the Interface object.
+  def call_child_interface(cmd)
+    interface = Expectr::Child.new(cmd)
+    @stdin = interface.stdin
+    @stdout = interface.stdout
+    @pid = interface.pid
+
+    Thread.new do
+      Process.wait @pid
+      @pid = 0
+    end
+
+    interface
+  end
+
+  # Internal: Call the Adopt Interface to instantiate the Expectr object.
+  # 
+  # args - Arguments hash passed per #initialize.
+  #
+  # Returns the Interface object.
+  def call_adopt_interface(args)
+    interface = Expectr::Adopt.new(args[:stdin], args[:stdout])
+    @stdin = interface.stdin
+    @stdout = interface.stdout
+    @pid = args[:pid] || 1
+
+    Thread.new do
+      Process.wait @pid
+      @pid = 0
+    end
+
+    interface
   end
 end

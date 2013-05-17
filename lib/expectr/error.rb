@@ -1,5 +1,10 @@
 class Expectr
-  # Public: Error to denote a problem with the running Process associated with
-  # the current Expectr object
+  # Public: Denotes a problem with the running Process associated with a
+  # Child Interface
   class ProcessError < StandardError; end
+
+  module Interface
+    # Public: Denotes an interface which cannot be killed (e.g. Lambda Interface)
+    class NotKillableError < StandardError; end
+  end
 end

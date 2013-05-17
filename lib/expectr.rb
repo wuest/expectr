@@ -1,10 +1,11 @@
-require 'pty'
 require 'timeout'
 require 'thread'
 require 'io/console'
 
 require 'expectr/error'
 require 'expectr/version'
+
+require 'expectr/child'
 
 # Public: Expectr is an API to the functionality of Expect (see
 # http://expect.nist.gov) implemented in ruby.
@@ -56,7 +57,7 @@ class Expectr
   # Public: Initialize a new Expectr object.
   # Spawns a sub-process and attaches to STDIN and STDOUT for the new process.
   #
-  # cmd  - A String or File referencing the application to launch
+  # cmd  - A String or File referencing the application to launch (default: '')
   # args - A Hash used to specify options for the new object (default: {}):
   #        :timeout      - Number of seconds that a call to Expectr#expect has
   #                        to complete (default: 30)
@@ -74,33 +75,37 @@ class Expectr
   #                        Expectr#expect, which will leave the update status
   #                        set to false, preventing further matches until more
   #                        output is generated otherwise. (default: false)
-  def initialize(cmd, args={})
-    cmd = cmd.path if cmd.kind_of?(File)
-    raise ArgumentError, "String or File expected" unless cmd.kind_of?(String)
-
+  #        :interface    - Interface Object to use when instantiating the new
+  #                        Expectr object. (default: Child)
+  def initialize(cmd = '', args = {})
+    setup_instance
     parse_options(args)
-    @buffer = ''
-    @discard = ''
-    @out_mutex = Mutex.new
-    @out_update = false
-    @interact = false
 
-    @stdout,@stdin,@pid = PTY.spawn(cmd)
-    @stdout.winsize = $stdout.winsize if $stdout.tty?
+    case args[:interface]
+    when :lambda
+    when :adopt
+    else
+      interface = Expectr::Child.new(cmd)
+      @stdin = interface.stdin
+      @stdout = interface.stdout
+      @pid = interface.pid
 
-    Thread.new do
-      process_output
+      Thread.new do
+        Process.wait @pid
+        @pid = 0
+      end
     end
 
-    Thread.new do
-      Process.wait @pid
-      @pid = 0
+    interface.init_instance.each do |spec|
+      ->(name, func) { define_singleton_method(name, func.call) }.call(*spec)
     end
+
+    Thread.new { output_loop }
   end
 
   # Public: Relinquish control of the running process to the controlling
-  # terminal, acting as a pass-through for the life of the process.  SIGINT
-  # will be caught and sent to the application as "\C-c".
+  # terminal, acting as a pass-through for the life of the process (or until
+  # the leave! method is called).
   #
   # args - A Hash used to specify options to be used for interaction (default:
   #        {}):
@@ -110,26 +115,12 @@ class Expectr
   #
   # Returns the interaction Thread
   def interact!(args = {})
-    raise ProcessError if @interact
-
-    blocking = args[:blocking] || false
-    @flush_buffer = args[:flush_buffer].nil? ? true : args[:flush_buffer]
-
-    interact = Thread.new do
-      env = prepare_interact_environment
-      input = ''
-
-      while @pid > 0 && @interact
-        if select([$stdin], nil, nil, 1)
-          c = $stdin.getc.chr
-          send c unless c.nil?
-        end
-      end
-
-      restore_environment(env)
+    if @interact
+      raise(ProcessError, "Already in interact mode")
     end
 
-    blocking ? interact.join : interact
+    @flush_buffer = args[:flush_buffer].nil? ? true : args[:flush_buffer]
+    args[:blocking] ? interact_thread.join : interact_thread
   end
 
   # Public: Report whether or not current Expectr object is in interact mode
@@ -144,32 +135,6 @@ class Expectr
   # Returns nothing.
   def leave!
     @interact=false
-  end
-
-  # Public: Kill the running process, raise ProcessError if the pid isn't > 1
-  #
-  # signal - Symbol, String, or Fixnum representing the signal to send to the
-  #          running process. (default: :TERM)
-  #
-  # Returns true if the process was successfully killed, false otherwise
-  def kill!(signal=:TERM)
-    raise ProcessError unless @pid > 0
-    (Process::kill(signal.to_sym, @pid) == 1)
-  end
-
-  # Public: Send input to the active process
-  #
-  # str - String to be sent to the active process
-  #
-  # Returns nothing.
-  # Raises Expectr::ProcessError if the process isn't running
-  def send(str)
-    begin
-      @stdin.syswrite str
-    rescue Errno::EIO #Application went away.
-      @pid = 0
-    end
-    raise Expectr::ProcessError unless @pid > 0
   end
 
   # Public: Wraps Expectr#send, appending a newline to the end of the string
@@ -249,6 +214,8 @@ class Expectr
     @stdout.winsize
   end
 
+  private
+
   # Internal: Print buffer to $stdout if @flush_buffer is true
   #
   # buf - String to be printed to $stdout
@@ -269,8 +236,6 @@ class Expectr
     return buf if buf.valid_encoding?
     buf.force_encoding('ISO-8859-1').encode('UTF-8', 'UTF-8', replace: nil)     
   end                                                                           
-
-  private
 
   # Internal: Determine values of instance options and set instance variables
   # appropriately, allowing for default values where nothing is passed.
@@ -302,32 +267,31 @@ class Expectr
     @flush_buffer = DEFAULT_FLUSH_BUFFER if @flush_buffer.nil?
   end
 
-  # Internal: Read from the process's stdout.  Force UTF-8 encoding, append to
-  # the internal buffer, and print to $stdout if appropriate.
+  # Internal: Initialize instance variables to their default values.
+  #
+  # Returns nothing.
+  def setup_instance
+    @buffer = ''
+    @discard = ''
+    @out_mutex = Mutex.new
+    @out_update = false
+    @interact = false
+  end
+
+  # Internal: Handle data from the interface, forcing UTF-8 encoding, appending
+  # it to the internal buffer, and printing it to $stdout if appropriate.
   #                                                                             
   # Returns nothing.
-  def process_output
-    while @pid > 0
-      unless select([@stdout], nil, nil, @timeout).nil?
-        buf = ''
+  def process_output(buf)
+    force_utf8(buf)
+    print_buffer(buf)
 
-        begin
-          @stdout.sysread(@buffer_size, buf)
-        rescue Errno::EIO #Application went away.
-          @pid = 0
-          return
-        end
-
-        print_buffer(force_utf8(buf))
-
-        @out_mutex.synchronize do
-          @buffer << buf
-          if @constrain && @buffer.length > @buffer_size
-            @buffer = @buffer[-@buffer_size..-1]
-          end
-          @out_update = true
-        end
+    @out_mutex.synchronize do
+      @buffer << buf
+      if @constrain && @buffer.length > @buffer_size
+        @buffer = @buffer[-@buffer_size..-1]
       end
+      @out_update = true
     end
   end
 

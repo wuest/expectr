@@ -1,6 +1,6 @@
 require 'helper'
 
-class CoreTests < Test::Unit::TestCase
+class TestAllCore < Test::Unit::TestCase
   # For the purpose of testing, we will assume we are working within a POSIX
   # environment.
   def setup

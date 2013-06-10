@@ -1,3 +1,3 @@
 class Expectr
-  VERSION = '2.0.0_a1'
+  VERSION = '2.0.0'
 end

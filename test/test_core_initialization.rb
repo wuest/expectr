@@ -1,6 +1,6 @@
 require 'helper'
 
-class InitializationTests < Test::Unit::TestCase
+class TestCoreInitialization < Test::Unit::TestCase
   def test_spawn_with_file
     assert_nothing_raised { exp = Expectr.new(File.new("/bin/ls"), flush_buffer: false) }
   end

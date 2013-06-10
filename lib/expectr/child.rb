@@ -108,29 +108,31 @@ class Expectr
           @stdout.winsize = $stdout.winsize
         end
 
-        @interact = true
         env
       }
     end
 
-    # Public: Create the thread containing the loop which is responsible for
+    # Public: Create a Thread containing the loop which is responsible for
     # handling input from the user in interact mode.
     #
     # Returns a Thread containing the running loop.
     def interface_interact_thread
       -> {
+        @interact = true
+        env = prepare_interact_environment
         Thread.new do
-          env = prepare_interact_environment
-          input = ''
+          begin
+            input = ''
 
-          while @pid > 0 && @interact
-            if select([$stdin], nil, nil, 1)
-              c = $stdin.getc.chr
-              send c unless c.nil?
+            while @pid > 0 && @interact
+              if select([$stdin], nil, nil, 1)
+                c = $stdin.getc.chr
+                send c unless c.nil?
+              end
             end
+          ensure
+            restore_environment(env)
           end
-
-          restore_environment(env)
         end
       }
     end

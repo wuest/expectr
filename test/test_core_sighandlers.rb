@@ -1,11 +1,15 @@
 require 'helper'
 
-class SignalHandlerTest < Test::Unit::TestCase
+class TestCoreSighandlers < Test::Unit::TestCase
   def setup
-    @exp = Expectr.new("bc", flush_buffer: false, timeout: 1)
+    @exp = Expectr.new("irb", flush_buffer: false, timeout: 1)
   end
 
-  def test_winsz_change
+  def teardown
+    @exp.kill! if @exp.pid > 0
+  end
+
+  def test_change_winsize
     winsize = $stdout.winsize
     [
       Thread.new {

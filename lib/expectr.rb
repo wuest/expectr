@@ -7,6 +7,7 @@ require 'expectr/version'
 
 require 'expectr/child'
 require 'expectr/adopt'
+require 'expectr/lambda'
 
 # Public: Expectr is an API to the functionality of Expect (see
 # http://expect.nist.gov) implemented in ruby.
@@ -84,6 +85,7 @@ class Expectr
 
     case args[:interface]
     when :lambda
+      interface = call_lambda_interface(args)
     when :adopt
       interface = call_adopt_interface(args)
     else
@@ -321,6 +323,20 @@ class Expectr
     interface
   end
 
+  # Internal: Call the Lambda Interface to instantiate the Expectr object.
+  # 
+  # args - Arguments hash passed per #initialize.
+  #
+  # Returns the Interface object.
+  def call_lambda_interface(args)
+    interface = Expectr::Lambda.new(args[:reader], args[:writer])
+    @pid = -1
+    @reader = interface.reader
+    @writer = interface.writer
+
+    interface
+  end
+
   # Internal: Call the Adopt Interface to instantiate the Expectr object.
   # 
   # args - Arguments hash passed per #initialize.
@@ -332,9 +348,11 @@ class Expectr
     @stdout = interface.stdout
     @pid = args[:pid] || 1
 
-    Thread.new do
-      Process.wait @pid
-      @pid = 0
+    if @pid > 0
+      Thread.new do
+        Process.wait @pid
+        @pid = 0
+      end
     end
 
     interface

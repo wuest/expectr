@@ -11,8 +11,8 @@ class Expectr
   # These methods will all be documented as if they are the Proc in question.
   class Adopt < Expectr::Child
     # Public: Initialize a new Expectr::Adopt object.
-    # Assigns IO objects instance variables to otherwise allow for
-    # interoperability with the methods from the Expectr::Child class.
+    # IO Objects are named in such a way as to maintain interoperability with
+    # the methods from the Expectr::Child class.
     #
     # stdin  - IO object open for writing.
     # stdout - IO object open for reading.

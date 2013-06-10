@@ -1,6 +1,6 @@
 require 'helper'
 
-class AdoptInterfaceTests < Test::Unit::TestCase
+class TestAdoptInterface < Test::Unit::TestCase
   def setup
     @pty_stdout,@pty_stdin,@pty_pid = PTY.spawn("/bin/ls")
   end

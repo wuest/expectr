@@ -37,7 +37,6 @@ class Expectr
   DEFAULT_FLUSH_BUFFER = true
   DEFAULT_BUFFER_SIZE  = 8192
   DEFAULT_CONSTRAIN    = false
-  DEFAULT_FORCE_MATCH  = false
 
   # Public: Gets/sets the number of seconds a call to Expectr#expect may last
   attr_accessor :timeout
@@ -47,8 +46,6 @@ class Expectr
   attr_accessor :buffer_size
   # Public: Gets/sets whether to constrain the buffer to the buffer size
   attr_accessor :constrain
-  # Public: Whether to always attempt to match once on calls to Expectr#expect.
-  attr_accessor :force_match
   # Public: Returns the PID of the running process
   attr_reader :pid
   # Public: Returns the active buffer to match against
@@ -71,12 +68,6 @@ class Expectr
   #                        (default: 8192)
   #        :constrain    - Whether to constrain the internal buffer from the
   #                        sub-process to :buffer_size (default: false)
-  #        :force_match  - Whether to always attempt to match against the
-  #                        internal buffer on a call to Expectr#expect.  This
-  #                        is relevant following a failed call to
-  #                        Expectr#expect, which will leave the update status
-  #                        set to false, preventing further matches until more
-  #                        output is generated otherwise. (default: false)
   #        :interface    - Interface Object to use when instantiating the new
   #                        Expectr object. (default: Child)
   def initialize(cmd = '', args = {})
@@ -170,7 +161,6 @@ class Expectr
   # Raises Timeout::Error if a match isn't found in time, unless recoverable
   def expect(pattern, recoverable = false)
     match = nil
-    @out_update ||= @force_match
     pattern = Regexp.new(Regexp.quote(pattern)) if pattern.kind_of?(String)
     unless pattern.kind_of?(Regexp)
       raise TypeError, "Pattern class should be String or Regexp"
@@ -184,7 +174,6 @@ class Expectr
       @out_mutex.synchronize do
         @discard = @buffer[0..match.begin(0)-1]
         @buffer = @buffer[match.end(0)..-1]
-        @out_update = true
       end
     rescue Timeout::Error => details
       raise(Timeout::Error, details) unless recoverable
@@ -199,7 +188,6 @@ class Expectr
   def clear_buffer!
     @out_mutex.synchronize do
       @buffer.clear
-      @out_update = false
     end
   end
 
@@ -239,19 +227,12 @@ class Expectr
   #                        maximum size of the internal buffer as well.
   #        :constrain    - Whether to constrain the internal buffer from the
   #                        sub-process to :buffer_size.
-  #        :force_match  - Whether to always attempt to match against the
-  #                        internal buffer on a call to Expectr#expect.  This
-  #                        is relevant following a failed call to
-  #                        Expectr#expect, which will leave the update status
-  #                        set to false, preventing further matches until more
-  #                        output is generated otherwise.
   #
   # Returns nothing.
   def parse_options(args)
     @timeout = args[:timeout] || DEFAULT_TIMEOUT
     @buffer_size = args[:buffer_size] || DEFAULT_BUFFER_SIZE
     @constrain = args[:constrain] || DEFAULT_CONSTRAIN
-    @force_match = args[:force_match] || DEFAULT_FORCE_MATCH
     @flush_buffer = args[:flush_buffer]
     @flush_buffer = DEFAULT_FLUSH_BUFFER if @flush_buffer.nil?
   end
@@ -262,8 +243,8 @@ class Expectr
   def setup_instance
     @buffer = ''
     @discard = ''
+    @thread = nil
     @out_mutex = Mutex.new
-    @out_update = false
     @interact = false
   end
 
@@ -280,7 +261,7 @@ class Expectr
       if @constrain && @buffer.length > @buffer_size
         @buffer = @buffer[-@buffer_size..-1]
       end
-      @out_update = true
+      @thread.wakeup if @thread
     end
   end
 
@@ -291,17 +272,16 @@ class Expectr
   # Returns a MatchData object containing the match found.
   def check_match(pattern)
     match = nil
+    @thread = Thread.current
     while match.nil?
-      if @out_update
-        @out_mutex.synchronize do
-          match = pattern.match(@buffer)
-          @out_update = false
-        end
+      @out_mutex.synchronize do
+        match = pattern.match(@buffer)
+        @out_mutex.sleep if match.nil?
       end
-      break unless match.nil?
-      sleep 0.1
     end
     match
+  ensure
+    @thread = nil
   end
 
   # Internal: Call the Child Interface to instantiate the Expectr object.

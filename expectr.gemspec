@@ -11,8 +11,10 @@ Gem::Specification.new do |s|
   s.email = "chris@chriswuest.com"
   s.homepage = "http://github.com/cwuest/expectr"
 
-  s.files = `git ls-files`.split("\n")
-	s.test_files = s.files.select { |f| f =~ /^test\/test_/ }
+  s.files = `git ls-files lib`.split("\n")
+  s.files += `git ls-files bin`.split("\n")
+
+  s.executables = ['expectr']
 
   s.license = 'MIT'
 end

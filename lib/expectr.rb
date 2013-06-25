@@ -3,6 +3,7 @@ require 'thread'
 require 'io/console'
 
 require 'expectr/error'
+require 'expectr/errstr'
 require 'expectr/version'
 
 require 'expectr/child'
@@ -103,7 +104,7 @@ class Expectr
   # Returns the interaction Thread
   def interact!(args = {})
     if @interact
-      raise(ProcessError, "Already in interact mode")
+      raise(ProcessError, Errstr::ALREADY_INTERACT)
     end
 
     @flush_buffer = args[:flush_buffer].nil? ? true : args[:flush_buffer]
@@ -136,7 +137,10 @@ class Expectr
   # Public: Begin a countdown and search for a given String or Regexp in the
   # output buffer.
   #
-  # pattern     - String or Regexp representing what we want to find
+  # pattern     - Object String or Regexp representing pattern for which to
+  #               search, or a Hash containing pattern -> Proc mappings to be
+  #               used in cases where multiple potential patterns should map
+  #               to distinct actions.
   # recoverable - Denotes whether failing to match the pattern should cause the
   #               method to raise an exception (default: false)
   #
@@ -154,32 +158,61 @@ class Expectr
   #
   #   exp.expect(/not there/, true)
   #   # => nil
+  #
+  #   hash = { "First possibility"  => -> { puts "option a" },
+  #            "Second possibility" => -> { puts "option b" },
+  #            default:             => -> { puts "called on timeout" } }
+  #   exp.expect(hash)
   # 
   # Returns a MatchData object once a match is found if no block is given
   # Yields the MatchData object representing the match
   # Raises TypeError if something other than a String or Regexp is given
   # Raises Timeout::Error if a match isn't found in time, unless recoverable
   def expect(pattern, recoverable = false)
+    return expect_procmap(pattern) if pattern.is_a?(Hash)
+
     match = nil
-    pattern = Regexp.new(Regexp.quote(pattern)) if pattern.kind_of?(String)
-    unless pattern.kind_of?(Regexp)
-      raise TypeError, "Pattern class should be String or Regexp"
+    pattern = Regexp.new(Regexp.quote(pattern)) if pattern.is_a?(String)
+    unless pattern.is_a?(Regexp)
+      raise(TypeError, Errstr::EXPECT_WRONG_TYPE)
     end
 
-    begin
-      Timeout::timeout(@timeout) do
-        match = check_match(pattern)
-      end
-
-      @out_mutex.synchronize do
-        @discard = @buffer[0..match.begin(0)-1]
-        @buffer = @buffer[match.end(0)..-1]
-      end
-    rescue Timeout::Error => details
-      raise(Timeout::Error, details) unless recoverable
-    end
-
+    match = watch_match(pattern, recoverable)
     block_given? ? yield(match) : match
+  end
+
+  # Public: Begin a countdown and search for any of multiple possible patterns,
+  # performing designated actions upon success/failure.
+  #
+  # pattern_map - Hash containing mappings between Strings or Regexps and
+  #               procedure objects.  Additionally, an optional action,
+  #               designated by :default or :timeout may be provided to specify
+  #               an action to take upon failure.
+  #
+  # Examples
+  #
+  #   exp.expect_procmap({
+  #     "option 1" => -> { puts "action 1" },
+  #     /option 2/ => -> { puts "action 2" },
+  #     :default   => -> { puts "default" }
+  #   })
+  # 
+  # Calls the procedure associated with the pattern provided.
+  def expect_procmap(pattern_map)
+    pattern_map, pattern, recoverable = process_procmap(pattern_map)
+    match = nil
+
+    match = watch_match(pattern, recoverable)
+
+    pattern_map.each do |s,p|
+      if s.is_a?(Regexp)
+        return p.call if s.match(match.to_s)
+      end
+    end
+
+    pattern_map[:default].call unless pattern_map[:default].nil?
+    pattern_map[:timeout].call unless pattern_map[:timeout].nil?
+    nil
   end
 
   # Public: Clear output buffer
@@ -269,6 +302,9 @@ class Expectr
   # This method should be wrapped in a Timeout block or otherwise have some
   # mechanism to break out of the loop.
   #
+  # pattern     - String or Regexp object containing the pattern for which to
+  #               watch.
+  #
   # Returns a MatchData object containing the match found.
   def check_match(pattern)
     match = nil
@@ -336,5 +372,56 @@ class Expectr
     end
 
     interface
+  end
+
+  # Internal: Watch for a match within the timeout period.
+  # 
+  # pattern     - String or Regexp object containing the pattern for which to
+  #               watch.
+  # recoverable - Boolean denoting whether a failure to find a match should be
+  #               considered fatal.
+  #
+  # Returns a MatchData object if a match was found, or else nil.
+  # Raises Timeout::Error if no match is found and recoverable is false.
+  def watch_match(pattern, recoverable)
+    match = nil
+
+    Timeout::timeout(@timeout) do
+      match = check_match(pattern)
+    end
+
+    @out_mutex.synchronize do
+      @discard = @buffer[0..match.begin(0)-1]
+      @buffer = @buffer[match.end(0)..-1]
+    end
+
+    match
+  rescue Timeout::Error => details
+    raise(Timeout::Error, details) unless recoverable
+    nil
+  end
+
+  # Internal: Process a pattern to procedure mapping, producing a sanitized
+  # Hash, a unified Regexp and a boolean denoting whether an Exception should
+  # be raised upon timeout.
+  # 
+  # pattern_map - A Hash containing mappings between patterns designated by
+  #               either strings or Regexp objects, to procedures.  Optionally,
+  #               either :default or :timeout may be mapped to a procedure in
+  #               order to designate an action to take upon timeout.
+  #
+  # Returns a Hash, Regexp and boolean object.
+  def process_procmap(pattern_map)
+    pattern_map = pattern_map.reduce({}) do |c,e|
+      c.merge((e[0].is_a?(Symbol) ? e[0] : Regexp.new(e[0].to_s)) => e[1])
+    end
+    pattern = pattern_map.keys.reduce("") do |c,e|
+      e.is_a?(Regexp) ? c + "(#{e.source})|" : c
+    end
+    pattern = Regexp.new(pattern.gsub(/\|$/, ''))
+    recoverable   = pattern_map.keys.include?(:default)
+    recoverable ||= pattern_map.keys.include?(:timeout)
+
+    return pattern_map, pattern, recoverable
   end
 end

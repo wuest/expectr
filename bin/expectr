@@ -1,0 +1,22 @@
+#!/usr/bin/env ruby
+
+require 'expectr'
+require 'expectr/interpreter'
+
+class Expectr
+  module Main extend self
+    # Public: Read and run source passed in to the interpreter.
+    #
+    # Returns nothing.
+    def run
+      src = ARGF.read
+      exit 2 unless src
+
+      interpreter = Expectr::Interpreter.new(src.untaint)
+      interpreter.filename = $FILENAME
+      interpreter.run
+    end
+  end
+end
+
+Expectr::Main.run

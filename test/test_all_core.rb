@@ -12,7 +12,6 @@ class TestAllCore < Test::Unit::TestCase
     assert_equal(false, @exp.flush_buffer)
     assert_equal(1, @exp.timeout)
     assert_equal(4096, @exp.buffer_size)
-    assert_equal(false, @exp.force_match)
   end
 
   # POSIX specifies /dev/console, /dev/null and /dev/tty must exist.
@@ -22,13 +21,9 @@ class TestAllCore < Test::Unit::TestCase
   end
 
   def test_match_failure
-    @exp.force_match = true
     assert_nothing_raised { @exp.expect(/ThisFileShouldNotExist/, true) }
     assert_nothing_raised { @exp.expect(/null/) }
-
-    @exp.force_match = false
     assert_raises(Timeout::Error) { @exp.expect(/ThisFileShouldNotExist/) }
-    assert_raises(Timeout::Error) { @exp.expect(/tty/) }
   end
 
   def test_clear_buffer

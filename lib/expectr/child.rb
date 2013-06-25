@@ -19,10 +19,12 @@ class Expectr
     # process.
     #
     # cmd - A String or File referencing the application to launch.
+    #
+    # Raises TypeError if argument is anything other than String or File.
     def initialize(cmd)
       cmd = cmd.path if cmd.kind_of?(File)
       unless cmd.kind_of?(String)
-        raise(ArgumentError, "String or File expected")
+        raise(TypeError, Errstr::STRING_FILE_EXPECTED)
       end
 
       @stdout,@stdin,@pid = PTY.spawn(cmd)
@@ -39,7 +41,9 @@ class Expectr
     # Raises ProcessError if the process is not running (@pid = 0).
     def interface_kill!
       ->(signal = :TERM) {
-        raise ProcessError unless @pid > 0
+        unless @pid > 0
+          raise(ProcessError, Errstr::PROCESS_NOT_RUNNING)
+        end
         Process::kill(signal.to_sym, @pid) == 1
       }
     end
@@ -58,7 +62,7 @@ class Expectr
           @pid = 0
         end
         unless @pid > 0
-          raise(Expectr::ProcessError, "Child process no longer exists")
+          raise(Expectr::ProcessError, Errstr::PROCESS_GONE)
         end
       }
     end

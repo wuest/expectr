@@ -7,4 +7,10 @@ class Expectr
     # Public: Denotes an interface which cannot be killed (e.g. Lambda Interface)
     class NotKillableError < StandardError; end
   end
+
+  class Interpreter
+    # Public: Denotes that input was attempted to be sent to a non-existant
+    # process.
+    class NotRunningError < StandardError; end
+  end
 end

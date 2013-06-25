@@ -20,9 +20,11 @@ class Expectr
     #          analogous to STDIN for a child process.
     # writer - Lambda which is meant to be interacted with as if it were
     #          analogous to STDOUT for a child process.
+    #
+    # Raises TypeError if arguments aren't of type Proc.
     def initialize(reader, writer)
       unless reader.kind_of?(Proc) && writer.kind_of?(Proc)
-        raise(TypeError, "Proc Objects expected for reader and writer")
+        raise(TypeError, Errstr::PROC_EXPECTED)
       end
 
       @reader = reader

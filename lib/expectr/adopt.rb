@@ -18,9 +18,11 @@ class Expectr
     # stdout - IO object open for reading.
     # pid    - FixNum corresponding to the PID of the process being adopted
     #          (default: 1)
+    #
+    # Raises TypeError if arguments are of type other than IO.
     def initialize(stdin, stdout)
       unless stdin.kind_of?(IO) && stdout.kind_of?(IO)
-        raise(TypeError, "Arguments of type IO expected")
+        raise(TypeError, Errstr::IO_EXPECTED)
       end
       @stdin = stdin
       @stdout = stdout

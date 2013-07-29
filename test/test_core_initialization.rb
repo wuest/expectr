@@ -14,11 +14,4 @@ class TestCoreInitialization < Test::Unit::TestCase
     assert_raises(Errno::ENOENT) { exp = Expectr.new("lib/ThisFileShouldNotExist", flush_buffer: false) }
     assert_raises(Errno::EACCES) { exp = Expectr.new("lib/expectr.rb", flush_buffer: false) }
   end
-
-  def test_spawn_from_child_interface
-    assert_nothing_raised do
-      expectr = Expectr::Child::spawn("/bin/ls", flush_buffer: false)
-      assert_equal(expectr.class, Expectr)
-    end
-  end
 end

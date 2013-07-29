@@ -13,10 +13,9 @@ require 'expectr/lambda'
 # Public: Expectr is an API to the functionality of Expect (see
 # http://expect.nist.gov) implemented in ruby.
 #
-# Expectr contrasts with Ruby's built-in Expect class by avoiding tying in
-# with the IO class, instead creating a new object entirely to allow for more
-# grainular control over the execution and display of the program being
-# run.
+# Expectr contrasts with Ruby's built-in expect.rb by avoiding tying in with
+# the IO class in favor of creating a new object entirely to allow for more
+# granular control over the execution and display of the program being run.
 #
 # Examples
 #
@@ -57,51 +56,57 @@ class Expectr
   # Public: Initialize a new Expectr object.
   # Spawns a sub-process and attaches to STDIN and STDOUT for the new process.
   #
-  # cmd  - A String or File referencing the application to launch (default: '')
-  # args - A Hash used to specify options for the new object (default: {}):
-  #        :timeout      - Number of seconds that a call to Expectr#expect has
-  #                        to complete (default: 30)
-  #        :flush_buffer - Whether to flush output of the process to the
-  #                        console (default: true)
-  #        :buffer_size  - Number of bytes to attempt to read from sub-process
-  #                        at a time.  If :constrain is true, this will be the
-  #                        maximum size of the internal buffer as well.
-  #                        (default: 8192)
-  #        :constrain    - Whether to constrain the internal buffer from the
-  #                        sub-process to :buffer_size (default: false)
-  #        :interface    - Interface Object to use when instantiating the new
-  #                        Expectr object. (default: Child)
-  def initialize(cmd = '', args = {})
+  # cmd_args - This may be either a Hash containing arguments (described below)
+  #            or a String or File Object referencing the application to launch
+  #            (assuming Child interface).  This argument, if not a Hash, will
+  #            be changed into the Hash { cmd: cmd_args }.  This argument will
+  #            be  merged with the args Hash, overriding any arguments
+  #            specified there.
+  #            This argument is kept around for the sake of backward
+  #            compatibility with extant Expectr scripts and may be deprecated
+  #            in the future.  (default: {})
+  # args     - A Hash used to specify options for the instance. (default: {}):
+  #            :timeout      - Number of seconds that a call to Expectr#expect
+  #                            has to complete (default: 30)
+  #            :flush_buffer - Whether to flush output of the process to the
+  #                            console (default: true)
+  #            :buffer_size  - Number of bytes to attempt to read from
+  #                            sub-process at a time.  If :constrain is true,
+  #                            this will be the maximum size of the internal
+  #                            buffer as well.  (default: 8192)
+  #            :constrain    - Whether to constrain the internal buffer from
+  #                            the sub-process to :buffer_size characters.
+  #                            (default: false)
+  #            :interface    - Interface Object to use when instantiating the
+  #                            new Expectr object. (default: Child)
+  def initialize(cmd_args = '', args = {})
     setup_instance
     parse_options(args)
 
-    case args[:interface]
-    when :lambda
-      interface = call_lambda_interface(args)
-    when :adopt
-      interface = call_adopt_interface(args)
-    else
-      interface = call_child_interface(cmd)
+    cmd_args = { cmd: cmd_args } unless cmd_args.is_a?(Hash)
+    args.merge!(cmd_args)
+
+    unless [:lambda, :adopt, :child].include?(args[:interface])
+      args[:interface] = :child
     end
 
-    interface.init_instance.each do |spec|
-      ->(name, func) { define_singleton_method(name, func.call) }.call(*spec)
-    end
+    self.extend self.class.const_get(args[:interface].capitalize)
+    init_interface(args)
 
     Thread.new { output_loop }
   end
 
-  # Public: Relinquish control of the running process to the controlling
+  # Public: Allow direct control of the running process from the controlling
   # terminal, acting as a pass-through for the life of the process (or until
   # the leave! method is called).
   #
-  # args - A Hash used to specify options to be used for interaction (default:
-  #        {}):
+  # args - A Hash used to specify options to be used for interaction.
+  #        (default: {}):
   #        :flush_buffer - explicitly set @flush_buffer to the value specified
   #        :blocking     - Whether to block on this call or allow code
   #                        execution to continue (default: false)
   #
-  # Returns the interaction Thread
+  # Returns the interaction Thread, calling #join on it if :blocking is true.
   def interact!(args = {})
     if @interact
       raise(ProcessError, Errstr::ALREADY_INTERACT)
@@ -111,23 +116,23 @@ class Expectr
     args[:blocking] ? interact_thread.join : interact_thread
   end
 
-  # Public: Report whether or not current Expectr object is in interact mode
+  # Public: Report whether or not current Expectr object is in interact mode.
   #
-  # Returns true or false
+  # Returns a boolean.
   def interact?
     @interact
   end
 
-  # Public: Cause the current Expectr object to drop out of interact mode
+  # Public: Cause the current Expectr object to leave interact mode.
   #
   # Returns nothing.
   def leave!
     @interact=false
   end
 
-  # Public: Wraps Expectr#send, appending a newline to the end of the string
+  # Public: Wraps Expectr#send, appending a newline to the end of the string.
   #
-  # str - String to be sent to the active process (default: '')
+  # str - String to be sent to the active process. (default: '')
   #
   # Returns nothing.
   def puts(str = '')
@@ -135,7 +140,8 @@ class Expectr
   end
 
   # Public: Begin a countdown and search for a given String or Regexp in the
-  # output buffer.
+  # output buffer, optionally taking further action based upon which, if any,
+  # match was found.
   #
   # pattern     - Object String or Regexp representing pattern for which to
   #               search, or a Hash containing pattern -> Proc mappings to be
@@ -163,7 +169,7 @@ class Expectr
   #            "Second possibility" => -> { puts "option b" },
   #            default:             => -> { puts "called on timeout" } }
   #   exp.expect(hash)
-  # 
+  #
   # Returns a MatchData object once a match is found if no block is given
   # Yields the MatchData object representing the match
   # Raises TypeError if something other than a String or Regexp is given
@@ -196,7 +202,7 @@ class Expectr
   #     /option 2/ => -> { puts "action 2" },
   #     :default   => -> { puts "default" }
   #   })
-  # 
+  #
   # Calls the procedure associated with the pattern provided.
   def expect_procmap(pattern_map)
     pattern_map, pattern, recoverable = process_procmap(pattern_map)
@@ -215,7 +221,7 @@ class Expectr
     nil
   end
 
-  # Public: Clear output buffer
+  # Public: Clear output buffer.
   #
   # Returns nothing.
   def clear_buffer!
@@ -226,9 +232,10 @@ class Expectr
 
   private
 
-  # Internal: Print buffer to $stdout if @flush_buffer is true
+  # Internal: Print buffer to $stdout if program output is expected to be
+  # echoed.
   #
-  # buf - String to be printed to $stdout
+  # buf - String to be printed to $stdout.
   #
   # Returns nothing.
   def print_buffer(buf)
@@ -236,19 +243,18 @@ class Expectr
     $stdout.flush unless $stdout.sync
   end
 
-  # Internal: Encode a String twice to force UTF-8 encoding, dropping           
-  # problematic characters in the process.                                      
-  #                                                                             
-  # buf  - String to be encoded.                                                
-  #                                                                             
-  # Returns the encoded String.                                                 
-  def force_utf8(buf)                                                           
+  # Internal: Encode a String twice to force UTF-8 encoding, dropping
+  # problematic characters in the process.
+  #
+  # buf  - String to be encoded.
+  #
+  # Returns the encoded String.
+  def force_utf8(buf)
     return buf if buf.valid_encoding?
-    buf.force_encoding('ISO-8859-1').encode('UTF-8', 'UTF-8', replace: nil)     
-  end                                                                           
+    buf.force_encoding('ISO-8859-1').encode('UTF-8', 'UTF-8', replace: nil)
+  end
 
-  # Internal: Determine values of instance options and set instance variables
-  # appropriately, allowing for default values where nothing is passed.
+  # Internal: Initialize instance variables based upon arguments provided.
   #
   # args - A Hash used to specify options for the new object (default: {}):
   #        :timeout      - Number of seconds that a call to Expectr#expect has
@@ -283,7 +289,7 @@ class Expectr
 
   # Internal: Handle data from the interface, forcing UTF-8 encoding, appending
   # it to the internal buffer, and printing it to $stdout if appropriate.
-  #                                                                             
+  #
   # Returns nothing.
   def process_output(buf)
     force_utf8(buf)
@@ -302,8 +308,7 @@ class Expectr
   # This method should be wrapped in a Timeout block or otherwise have some
   # mechanism to break out of the loop.
   #
-  # pattern     - String or Regexp object containing the pattern for which to
-  #               watch.
+  # pattern - String or Regexp containing the pattern for which to watch.
   #
   # Returns a MatchData object containing the match found.
   def check_match(pattern)
@@ -320,62 +325,8 @@ class Expectr
     @thread = nil
   end
 
-  # Internal: Call the Child Interface to instantiate the Expectr object.
-  # 
-  # cmd - String or File object referencing the command to be run.
-  #
-  # Returns the Interface object.
-  def call_child_interface(cmd)
-    interface = Expectr::Child.new(cmd)
-    @stdin = interface.stdin
-    @stdout = interface.stdout
-    @pid = interface.pid
-
-    Thread.new do
-      Process.wait @pid
-      @pid = 0
-    end
-
-    interface
-  end
-
-  # Internal: Call the Lambda Interface to instantiate the Expectr object.
-  # 
-  # args - Arguments hash passed per #initialize.
-  #
-  # Returns the Interface object.
-  def call_lambda_interface(args)
-    interface = Expectr::Lambda.new(args[:reader], args[:writer])
-    @pid = -1
-    @reader = interface.reader
-    @writer = interface.writer
-
-    interface
-  end
-
-  # Internal: Call the Adopt Interface to instantiate the Expectr object.
-  # 
-  # args - Arguments hash passed per #initialize.
-  #
-  # Returns the Interface object.
-  def call_adopt_interface(args)
-    interface = Expectr::Adopt.new(args[:stdin], args[:stdout])
-    @stdin = interface.stdin
-    @stdout = interface.stdout
-    @pid = args[:pid] || 1
-
-    if @pid > 0
-      Thread.new do
-        Process.wait @pid
-        @pid = 0
-      end
-    end
-
-    interface
-  end
-
   # Internal: Watch for a match within the timeout period.
-  # 
+  #
   # pattern     - String or Regexp object containing the pattern for which to
   #               watch.
   # recoverable - Boolean denoting whether a failure to find a match should be
@@ -404,23 +355,31 @@ class Expectr
   # Internal: Process a pattern to procedure mapping, producing a sanitized
   # Hash, a unified Regexp and a boolean denoting whether an Exception should
   # be raised upon timeout.
-  # 
+  #
   # pattern_map - A Hash containing mappings between patterns designated by
   #               either strings or Regexp objects, to procedures.  Optionally,
   #               either :default or :timeout may be mapped to a procedure in
-  #               order to designate an action to take upon timeout.
+  #               order to designate an action to take upon failure to match
+  #               any other pattern.
   #
   # Returns a Hash, Regexp and boolean object.
   def process_procmap(pattern_map)
+    # Normalize Hash keys, allowing only Regexps and Symbols for keys.
     pattern_map = pattern_map.reduce({}) do |c,e|
-      c.merge((e[0].is_a?(Symbol) ? e[0] : Regexp.new(e[0].to_s)) => e[1])
+      unless e[0].is_a?(Symbol) || e[0].is_a?(Regexp)
+        e[0] = Regexp.new(Regexp.escape(e[0].to_s))
+      end
+      c.merge(e[0] => e[1])
     end
-    pattern = pattern_map.keys.reduce("") do |c,e|
-      e.is_a?(Regexp) ? c + "(#{e.source})|" : c
+
+    # Separate out non-Symbol keys and build a unified Regexp.
+    regex_keys = pattern_map.keys.select { |e| e.is_a?(Regexp) }
+    pattern = regex_keys.reduce("") do |c,e|
+      c += "|" unless c.empty?
+      c + "(#{e.source})"
     end
-    pattern = Regexp.new(pattern.gsub(/\|$/, ''))
-    recoverable   = pattern_map.keys.include?(:default)
-    recoverable ||= pattern_map.keys.include?(:timeout)
+
+    recoverable = regex_keys.include?(:default) || regex_keys.include?(:timeout)
 
     return pattern_map, pattern, recoverable
   end

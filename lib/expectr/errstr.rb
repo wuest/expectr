@@ -4,7 +4,7 @@ class Expectr
     ALREADY_INTERACT  = "Already in interact mode"
   end
 
-  class Child
+  module Child
     module Errstr
       STRING_FILE_EXPECTED = "Command should be of type String or File"
       PROCESS_NOT_RUNNING  = "No process is running"
@@ -12,7 +12,7 @@ class Expectr
     end
   end
 
-  class Adopt < Child
+  module Adopt
     module Errstr
       IO_EXPECTED = "Arguments of type IO expected"
     end
@@ -25,7 +25,7 @@ class Expectr
     end
   end
 
-  class Lambda
+  module Lambda
     module Errstr
       PROC_EXPECTED = "Proc Objects expected for reader and writer"
     end

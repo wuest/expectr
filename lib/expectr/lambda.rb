@@ -2,33 +2,29 @@ require 'expectr'
 require 'expectr/interface'
 
 class Expectr
-  # Internal: The Expectr::Lambda Class contains the interface to interacting
-  # with ruby objects transparently via lambdas in a manner consistent with
-  # other Expectr interfaces.
-  #
-  # All methods with the prefix 'interface_' in their name will return a Proc
-  # designed to be defined as an instance method in the primary Expectr object.
-  # These methods will all be documented as if they are the Proc in question.
-  class Lambda
+  # Public: The Expectr::Lambda Module defines the interface for interacting
+  # with Proc objects in a manner which is similar to interacting with
+  # processes.
+  module Lambda
     include Expectr::Interface
-    attr_reader :reader
-    attr_reader :writer
 
-    # Public: Initialize a new Expectr::Lambda object.
+    # Public: Initialize the Expectr Lambda interface.
     #
-    # reader - Lambda which is meant to be interacted with as if it were
-    #          analogous to STDIN for a child process.
-    # writer - Lambda which is meant to be interacted with as if it were
-    #          analogous to STDOUT for a child process.
+    # args - Hash containing Proc objects to act as reader and writer:
+    #        reader - Lambda which is meant to be interacted with as if it were
+    #                 analogous to STDIN for a child process.
+    #        writer - Lambda which is meant to be interacted with as if it were
+    #                 analogous to STDOUT for a child process.
     #
     # Raises TypeError if arguments aren't of type Proc.
-    def initialize(reader, writer)
-      unless reader.kind_of?(Proc) && writer.kind_of?(Proc)
+    def init_interface(args)
+      unless args[:reader].kind_of?(Proc) && args[:writer].kind_of?(Proc)
         raise(TypeError, Errstr::PROC_EXPECTED)
       end
 
-      @reader = reader
-      @writer = writer
+      @pid = -1
+      @reader = args[:reader]
+      @writer = args[:writer]
     end
 
     # Public: Present a streamlined interface to create a new Expectr instance.
@@ -45,87 +41,82 @@ class Expectr
       args[:interface] = :lambda
       args[:reader] = reader
       args[:writer] = writer
-      Expectr.new('', args)
+      Expectr.new(args)
     end
 
-    # Public: Send input to the active child process.
+    # Public: Send input to the reader Proc.
     #
     # args - Arguments to pass to the reader interface.
     #
     # Returns nothing.
-    def interface_send
-      ->(args) {
-        @reader.call(*args)
-      }
+    def send(args)
+      @reader.call(*args)
     end
 
     # Public: Prepare the operating environment for interact mode, set the
     # interact flag to true.
     #
     # Returns a Hash containing old signal handlers and tty parameters.
-    def interface_prepare_interact_environment
-      -> {
-        env = {sig: {}}
+    def prepare_interact_environment
+      env = {sig: {}}
 
-        # Save old tty settings and set up the new environment
-        env[:tty] = `stty -g`
-        `stty -icanon min 1 time 0 -echo`
+      # Save old tty settings and set up the new environment
+      env[:tty] = `stty -g`
+      `stty -icanon min 1 time 0 -echo`
 
-        # SIGINT should be sent to the child as \C-c
-        env[:sig]['INT'] = trap 'INT' do
-          send "\C-c"
-        end
+      # SIGINT should be sent to the child as \C-c
+      env[:sig]['INT'] = trap 'INT' do
+        send "\C-c"
+      end
 
-        # SIGTSTP should be sent to the process as \C-z
-        env[:sig]['TSTP'] = trap 'TSTP' do
-          send "\C-z"
-        end
+      # SIGTSTP should be sent to the process as \C-z
+      env[:sig]['TSTP'] = trap 'TSTP' do
+        send "\C-z"
+      end
 
-        @interact = true
-        env
-      }
+      @interact = true
+      env
     end
 
     # Public: Create a Thread containing the loop which is responsible for
     # handling input from the user in interact mode.
     #
     # Returns a Thread containing the running loop.
-    def interface_interact_thread
-      -> {
-        Thread.new do
-          env = prepare_interact_environment
-          input = ''
+    def interact_thread
+      Thread.new do
+        env = prepare_interact_environment
+        input = ''
 
-          while @interact
-            if select([$stdin], nil, nil, 1)
-              c = $stdin.getc.chr
-              send c unless c.nil?
-            end
+        while @interact
+          if select([$stdin], nil, nil, 1)
+            c = $stdin.getc.chr
+            send c unless c.nil?
           end
-
-          restore_environment(env)
         end
-      }
+
+        restore_environment(env)
+      end
     end
 
-    # Internal: Call the writer lambda, reading the output, forcing UTF-8 and
-    # appending to the internal buffer and printing to $stdout if appropriate.
+    private
+
+    # Internal: Call the writer lambda, reading the output produced, forcing
+    # UTF-8, appending to the internal buffer and printing to $stdout if
+    # appropriate.
     #
     # Returns nothing.
-    def interface_output_loop
-      -> {
-        buf = ''
-        loop do
-          buf.clear
+    def output_loop
+      buf = ''
+      loop do
+        buf.clear
 
-          begin
-            buf << @writer.call.to_s
-          rescue Errno::EIO # Lambda is signaling that execution should end.
-            return
-          end
-          process_output(buf)
+        begin
+          buf << @writer.call.to_s
+        rescue Errno::EIO # Lambda is signaling that execution should end.
+          return
         end
-      }
+        process_output(buf)
+      end
     end
   end
 end

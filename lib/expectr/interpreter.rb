@@ -9,7 +9,7 @@ class Expectr
     # Public: Filename of currently executing script.
     attr_accessor :filename
 
-    # Public: Initialize a new Expectr interface.
+    # Public: Initialize a new Expectr Interpreter interface.
     #
     # source - String containing the source to be executed.
     def initialize(source)
@@ -18,8 +18,7 @@ class Expectr
       @expect = nil
     end
 
-    # Public: Run the source associated with the Interface object, bound to the
-    # Object.
+    # Public: Run the source associated with the Interface object.
     #
     # Returns nothing.
     def run
@@ -45,7 +44,7 @@ class Expectr
     #          true, and 0 or less is false.
     # 
     # Returns nothing.
-    # Raises Argument
+    # Raises TypeError if enable is not a boolean.
     def log_user(enable)
       if enable.is_a?(Numeric)
         enable = (enable > 0)

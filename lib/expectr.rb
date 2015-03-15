@@ -318,7 +318,7 @@ class Expectr
       @out_mutex.synchronize do
         match = pattern.match(@buffer)
         if match.nil?
-          raise Timeout::Error if @pid < 1
+          raise Timeout::Error if @pid.zero?
           @out_mutex.sleep
         end
       end

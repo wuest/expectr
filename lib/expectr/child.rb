@@ -74,6 +74,7 @@ class Expectr
             @stdout.sysread(@buffer_size, buf)
           rescue Errno::EIO #Application is not running
             @pid = 0
+            @thread.wakeup if @thread
             return
           end
           process_output(buf)

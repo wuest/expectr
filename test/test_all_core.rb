@@ -42,4 +42,11 @@ class TestAllCore < Test::Unit::TestCase
   def test_pid_set
     assert_not_equal(0, @exp.pid)
   end
+
+  def test_matches_fail_fast_if_process_ended
+    exp  = Expectr.new("echo ''", flush_buffer: false, timeout: 30)
+    time = Time.now
+    assert_raises(Timeout::Error) { exp.expect(/not here/) }
+    assert { Time.now - time < 30 }
+  end
 end

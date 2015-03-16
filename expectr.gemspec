@@ -7,9 +7,9 @@ Gem::Specification.new do |s|
 
   s.description = "Expectr is an interface to the functionality of Expect in Ruby"
   s.summary = "Expect for Ruby"
-  s.authors = ["Chris Wuest"]
-  s.email = "chris@chriswuest.com"
-  s.homepage = "http://github.com/cwuest/expectr"
+  s.authors = ["Tina Wuest"]
+  s.email = "tina@wuest.me"
+  s.homepage = "http://github.com/wuest/expectr"
 
   s.files = `git ls-files lib`.split("\n")
   s.files += `git ls-files bin`.split("\n")

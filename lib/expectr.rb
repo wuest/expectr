@@ -319,7 +319,7 @@ class Expectr
         match = pattern.match(@buffer)
         if match.nil?
           raise Timeout::Error if @pid.zero?
-          @out_mutex.sleep if Thread.list.size > 1
+          @out_mutex.sleep
         end
       end
     end

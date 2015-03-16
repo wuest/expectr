@@ -53,7 +53,7 @@ class Expectr
     def send(str)
       begin
         @stdin.syswrite str
-      rescue Errno::EIO #Application is not running
+      rescue Errno::EIO, EOFError # Application is not running
         @pid = 0
       end
       unless @pid > 0

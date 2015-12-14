@@ -381,8 +381,9 @@ class Expectr
       c += "|" unless c.empty?
       c + "(#{e.source})"
     end
+    pattern = Regexp.new(pattern)
 
-    recoverable = regex_keys.include?(:default) || regex_keys.include?(:timeout)
+    recoverable = pattern_map.keys.include?(:default) || pattern_map.keys.include?(:timeout)
 
     return pattern_map, pattern, recoverable
   end
